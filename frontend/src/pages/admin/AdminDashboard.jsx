@@ -35,7 +35,7 @@ export default function AdminDashboard() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Unable to load admin metrics.");
+      setError(err.message || "Unable to load admin metrics.");
     }
   };
 

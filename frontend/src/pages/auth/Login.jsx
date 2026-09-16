@@ -6,8 +6,8 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 
 export default function Login() {
-  const [email, setEmail] = useState('user@parking.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   
   const { login, loading } = useAuth();
@@ -72,25 +72,6 @@ export default function Login() {
             placeholder="••••••••"
             required
           />
-
-          {/* Preset Fill Shortcuts for Demo Convenience */}
-          <div className="flex gap-2 pt-1 text-[11px]">
-            <button
-              type="button"
-              onClick={() => { setEmail('user@parking.com'); setPassword('password123'); }}
-              className="text-brand-600 hover:underline font-semibold"
-            >
-              Fill User
-            </button>
-            <span className="text-slate-300">•</span>
-            <button
-              type="button"
-              onClick={() => { setEmail('admin@parking.com'); setPassword('admin123'); }}
-              className="text-amber-600 hover:underline font-semibold"
-            >
-              Fill Admin
-            </button>
-          </div>
 
           <Button
             type="submit"

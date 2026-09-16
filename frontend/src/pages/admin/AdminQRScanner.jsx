@@ -5,7 +5,7 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 
 export default function AdminQRScanner() {
-  const [inputCode, setInputCode] = useState('BK101-A1F9');
+  const [inputCode, setInputCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [scanResult, setScanResult] = useState(null);
 
@@ -66,28 +66,9 @@ export default function AdminQRScanner() {
             icon={QrCode}
             value={inputCode}
             onChange={(e) => setInputCode(e.target.value)}
-            placeholder="e.g. BK101-A1F9"
+            placeholder="Enter the booking code from the user pass"
             required
           />
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              onClick={() => setInputCode('BK101-A1F9')}
-              variant="outline"
-              size="sm"
-            >
-              Fill BK101 (Valid)
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setInputCode('BK099-Z4K2')}
-              variant="outline"
-              size="sm"
-            >
-              Fill BK099 (Completed)
-            </Button>
-          </div>
 
           <Button
             type="submit"

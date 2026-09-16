@@ -1,11 +1,77 @@
-import { apiClient, ENABLE_MOCK } from './apiClient';
+import { apiClient, ENABLE_MOCK, throwApiError, extractErrorMessage } from './apiClient';
 import { sharedMockRepository, INITIAL_AI3_PREDICTIONS } from '../mock/mockData';
+import { parkingApi, fetchSlotsForArea, occupancyFromSlots, mapParkingArea } from './parkingApi';
+import { mapBooking } from './bookingApi';
+
+function toParkingAreaPayload(data) {
+  return {
+    name: (data.name || '').trim(),
+    address: (data.address || '').trim(),
+    latitude: parseFloat(data.latitude),
+    longitude: parseFloat(data.longitude),
+    hourlyRate: parseFloat(data.hourlyRate),
+    totalSlots: parseInt(data.totalSlots, 10)
+  };
+}
+
+async function fetchAllBookings() {
+  const usersResponse = await apiClient.get('/api/users');
+  const users = usersResponse.data || [];
+  const nested = await Promise.all(
+    users.map(async (user) => {
+      const response = await apiClient.get(`/api/users/${user.id}/bookings`);
+      return (response.data || []).map(mapBooking);
+    })
+  );
+  return nested.flat();
+}
+
+async function createSlotsForArea(parkingAreaId, totalSlots) {
+  const count = Number(totalSlots) || 0;
+  for (let i = 1; i <= count; i++) {
+    await apiClient.post(`/api/parking-areas/${parkingAreaId}/slots`, {
+      slotNumber: `S-${String(i).padStart(2, '0')}`,
+      status: 'AVAILABLE'
+    });
+  }
+}
 
 export const adminApi = {
   getDashboardStats: async () => {
     try {
-      const response = await apiClient.get('/api/admin/dashboard');
-      return response.data;
+      const areas = await parkingApi.getAllParkingAreas();
+      const bookings = await fetchAllBookings();
+
+      let totalSlots = 0;
+      let availableSlots = 0;
+      let occupiedSlots = 0;
+      let reservedSlots = 0;
+
+      areas.forEach((p) => {
+        totalSlots += p.totalSlots || 0;
+        availableSlots += p.availableSlots || 0;
+        occupiedSlots += p.occupiedSlots || 0;
+        reservedSlots += Math.max(
+          0,
+          (p.totalSlots || 0) - (p.availableSlots || 0) - (p.occupiedSlots || 0)
+        );
+      });
+
+      return {
+        totalParkingAreas: areas.length,
+        totalSlots,
+        availableSlots,
+        occupiedSlots,
+        reservedSlots,
+        activeBookings: bookings.filter(
+          (b) => b.status === 'PENDING_CHECK_IN' || b.status === 'CHECKED_IN'
+        ).length,
+        completedBookings: bookings.filter((b) => b.status === 'COMPLETED').length,
+        totalRevenue: bookings
+          .filter((b) => b.status !== 'PENDING_PAYMENT' && b.status !== 'CANCELLED')
+          .reduce((sum, b) => sum + Number(b.totalAmount || b.amount || 0), 0),
+        overallOccupancyPercentage: Math.round((occupiedSlots / (totalSlots || 1)) * 100)
+      };
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
@@ -34,27 +100,30 @@ export const adminApi = {
           ai3Predictions: INITIAL_AI3_PREDICTIONS
         };
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   getParkingAreas: async () => {
     try {
-      const response = await apiClient.get('/api/admin/parking-areas');
-      return response.data;
+      return await parkingApi.getAllParkingAreas();
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 200));
         return sharedMockRepository.parkingAreas;
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   createParkingArea: async (data) => {
     try {
-      const response = await apiClient.post('/api/admin/parking-areas', data);
-      return response.data;
+      const payload = toParkingAreaPayload(data);
+      const response = await apiClient.post('/api/parking-areas', payload);
+      const created = response.data;
+      await createSlotsForArea(created.id, created.totalSlots || payload.totalSlots);
+      const slots = await fetchSlotsForArea(created.id);
+      return mapParkingArea(created, occupancyFromSlots(slots, created.totalSlots));
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
@@ -62,7 +131,6 @@ export const adminApi = {
         const trimmedName = (data.name || '').trim();
         const trimmedAddress = (data.address || '').trim();
 
-        // Guard against duplicate creation
         const existing = sharedMockRepository.parkingAreas.find(
           (p) => p.name.toLowerCase() === trimmedName.toLowerCase() && p.address.toLowerCase() === trimmedAddress.toLowerCase()
         );
@@ -98,14 +166,16 @@ export const adminApi = {
 
         return newParking;
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   updateParkingArea: async (id, data) => {
     try {
-      const response = await apiClient.put(`/api/admin/parking-areas/${id}`, data);
-      return response.data;
+      const payload = toParkingAreaPayload(data);
+      const response = await apiClient.put(`/api/parking-areas/${id}`, payload);
+      const slots = await fetchSlotsForArea(id);
+      return mapParkingArea(response.data, occupancyFromSlots(slots, response.data.totalSlots));
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
@@ -123,14 +193,14 @@ export const adminApi = {
         }
         throw new Error("Parking area not found");
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   deleteParkingArea: async (id) => {
     try {
-      const response = await apiClient.delete(`/api/admin/parking-areas/${id}`);
-      return response.data;
+      await apiClient.delete(`/api/parking-areas/${id}`);
+      return { success: true };
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
@@ -138,40 +208,43 @@ export const adminApi = {
         delete sharedMockRepository.slots[id];
         return { success: true, message: "Parking area removed successfully." };
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   getSlots: async (parkingAreaId) => {
     try {
-      const response = await apiClient.get(`/api/admin/parking-areas/${parkingAreaId}/slots`);
-      return response.data;
+      return await fetchSlotsForArea(parkingAreaId);
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
         return sharedMockRepository.slots[parkingAreaId] || [];
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   getAllBookings: async () => {
     try {
-      const response = await apiClient.get('/api/admin/bookings');
-      return response.data;
+      return await fetchAllBookings();
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
         return sharedMockRepository.bookings;
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   processCheckIn: async (bookingCode) => {
     try {
       const response = await apiClient.post('/api/check-in', { bookingCode });
-      return response.data;
+      const data = response.data;
+      return {
+        ...data,
+        status: data.bookingStatus === 'CHECKED_IN' ? 'VALID' : data.bookingStatus,
+        message: 'Check-in successful! Gate access granted.'
+      };
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 500));
@@ -235,14 +308,37 @@ export const adminApi = {
           message: "Check-in successful! Gate access granted."
         };
       }
-      throw error;
+
+      const message = extractErrorMessage(error);
+      const lower = message.toLowerCase();
+      let status = 'INVALID';
+      if (lower.includes('already been checked in')) {
+        status = 'ALREADY_CHECKED_IN';
+      } else if (lower.includes('completed')) {
+        status = 'COMPLETED';
+      } else if (lower.includes('payment')) {
+        status = 'UNPAID';
+      } else if (error.response?.status === 404) {
+        status = 'NOT_FOUND';
+      } else if (lower.includes('cancelled')) {
+        status = 'CANCELLED';
+      }
+
+      if (error.response) {
+        return {
+          status,
+          message,
+          bookingCode
+        };
+      }
+      throwApiError(error);
     }
   },
 
   completeBookingSession: async (bookingId) => {
     try {
-      const response = await apiClient.post(`/api/admin/bookings/${bookingId}/complete`);
-      return response.data;
+      const response = await apiClient.put(`/api/bookings/${bookingId}/complete`);
+      return mapBooking(response.data);
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 400));
@@ -253,20 +349,11 @@ export const adminApi = {
         }
         return { success: true, message: "Booking session marked as COMPLETED." };
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   getPredictionReports: async () => {
-    try {
-      const response = await apiClient.get('/api/admin/reports/predictions');
-      return response.data;
-    } catch (error) {
-      if (ENABLE_MOCK) {
-        await new Promise((res) => setTimeout(res, 300));
-        return INITIAL_AI3_PREDICTIONS;
-      }
-      throw error;
-    }
+    return null;
   }
 };

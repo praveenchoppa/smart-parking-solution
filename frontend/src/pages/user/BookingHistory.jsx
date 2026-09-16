@@ -6,11 +6,13 @@ import StatusBadge from '../../components/common/StatusBadge';
 import Button from '../../components/common/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import ErrorState from '../../components/common/ErrorState';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 
 export default function BookingHistory() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
 
@@ -18,12 +20,14 @@ export default function BookingHistory() {
 
   const fetchHistory = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await bookingApi.getUserBookingHistory();
       setBookings(data || []);
       setLoading(false);
     } catch (err) {
       setLoading(false);
+      setError(err.message || "Unable to load booking history.");
     }
   };
 
@@ -43,6 +47,7 @@ export default function BookingHistory() {
   });
 
   if (loading) return <LoadingSpinner message="Loading your booking history..." fullScreen />;
+  if (error) return <ErrorState message={error} onRetry={fetchHistory} />;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">

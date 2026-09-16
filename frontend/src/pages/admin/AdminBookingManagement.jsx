@@ -23,7 +23,7 @@ export default function AdminBookingManagement() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Unable to load booking records.");
+      setError(err.message || "Unable to load booking records.");
     }
   };
 
@@ -41,7 +41,7 @@ export default function AdminBookingManagement() {
         )
       );
     } catch (err) {
-      alert("Failed to mark session complete.");
+      alert(err.message || "Failed to mark session complete.");
     }
   };
 

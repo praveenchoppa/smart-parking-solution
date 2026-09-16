@@ -1,15 +1,16 @@
-import { apiClient, ENABLE_MOCK } from './apiClient';
+import { apiClient, ENABLE_MOCK, throwApiError } from './apiClient';
 import { bookingApi } from './bookingApi';
 
 export const paymentApi = {
-  processPayment: async (bookingId, paymentDetails = {}) => {
+  processPayment: async (bookingId) => {
     try {
-      const response = await apiClient.post(`/api/bookings/${bookingId}/payment`, paymentDetails);
+      const response = await apiClient.post('/api/payments', {
+        bookingId: Number(bookingId)
+      });
       return response.data;
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 800));
-        // Update booking status in mock repository
         const booking = await bookingApi.getBookingDetails(bookingId);
         if (booking) {
           booking.status = "PENDING_CHECK_IN";
@@ -17,15 +18,14 @@ export const paymentApi = {
           booking.qrData = booking.bookingCode;
         }
         return {
-          success: true,
-          status: "PENDING_CHECK_IN",
-          paymentStatus: "PAID",
+          id: Date.now(),
           bookingId: Number(bookingId),
-          transactionId: `TXN-${Date.now()}`,
-          message: "Payment processed successfully."
+          paymentMode: "SIMULATED",
+          status: "SUCCESS",
+          paidAt: new Date().toISOString()
         };
       }
-      throw error;
+      throwApiError(error);
     }
   }
 };

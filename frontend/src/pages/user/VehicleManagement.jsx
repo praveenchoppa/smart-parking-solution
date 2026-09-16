@@ -44,7 +44,7 @@ export default function VehicleManagement() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Unable to load user vehicles.");
+      setError(err.message || "Unable to load user vehicles.");
     }
   };
 
@@ -111,7 +111,7 @@ export default function VehicleManagement() {
         setSelectedVehicle(vehicles.find((v) => v.id !== id) || null);
       }
     } catch (err) {
-      alert("Failed to delete vehicle.");
+      alert(err.message || "Failed to delete vehicle.");
     }
   };
 
@@ -223,8 +223,6 @@ export default function VehicleManagement() {
             options={[
               { value: 'CAR', label: 'Car / Sedan' },
               { value: 'SUV', label: 'SUV / Crossover' },
-              { value: 'HATCHBACK', label: 'Hatchback' },
-              { value: 'EV', label: 'Electric Vehicle (EV)' },
               { value: 'BIKE', label: 'Two-Wheeler / Motorbike' }
             ]}
           />

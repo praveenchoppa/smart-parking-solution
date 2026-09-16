@@ -6,21 +6,25 @@ import StatusBadge from '../../components/common/StatusBadge';
 import Button from '../../components/common/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import ErrorState from '../../components/common/ErrorState';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 
 export default function CurrentBooking() {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const fetchCurrent = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await bookingApi.getCurrentBooking();
       setBooking(data);
       setLoading(false);
     } catch (err) {
       setLoading(false);
+      setError(err.message || "Unable to load current booking.");
     }
   };
 
@@ -29,6 +33,7 @@ export default function CurrentBooking() {
   }, []);
 
   if (loading) return <LoadingSpinner message="Checking active booking status..." fullScreen />;
+  if (error) return <ErrorState message={error} onRetry={fetchCurrent} />;
 
   if (!booking) {
     return (

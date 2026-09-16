@@ -1,10 +1,7 @@
-package com.smartparking.backend.user.dto;
-
-import com.smartparking.backend.user.entity.Role;
+package com.smartparking.backend.auth.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -12,7 +9,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class CreateUserRequest {
+public class RegisterRequest {
 
     @NotBlank(message = "Name is required")
     private String name;
@@ -27,9 +24,6 @@ public class CreateUserRequest {
             message = "Phone must contain 10 to 15 digits and may start with +"
     )
     private String phone;
-
-    @NotNull(message = "Role is required")
-    private Role role;
 
     @NotBlank(message = "Password is required")
     @Size(min = 6, max = 72, message = "Password must be between 6 and 72 characters")

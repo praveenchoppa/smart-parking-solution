@@ -19,7 +19,7 @@ export default function QRBookingPass() {
     try {
       let data;
       if (id) {
-        data = await bookingApi.getBookingDetails(id);
+        data = await bookingApi.getBookingConfirmation(id);
       } else {
         data = await bookingApi.getCurrentBooking();
       }
@@ -27,7 +27,7 @@ export default function QRBookingPass() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Unable to load booking pass details.");
+      setError(err.message || "Unable to load booking pass details.");
     }
   };
 

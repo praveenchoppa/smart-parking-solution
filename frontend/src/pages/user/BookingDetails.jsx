@@ -23,7 +23,7 @@ export default function BookingDetails() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Unable to load booking details.");
+      setError(err.message || "Unable to load booking details.");
     }
   };
 

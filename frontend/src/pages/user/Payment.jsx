@@ -24,11 +24,9 @@ export default function Payment() {
     setPaymentState('PROCESSING');
     setErrorMsg('');
     try {
-      const response = await paymentApi.processPayment(booking.id, {
-        method: "SIMULATED_CARD"
-      });
+      const response = await paymentApi.processPayment(booking.id);
 
-      if (response.success) {
+      if (response.status === 'SUCCESS') {
         setPaymentState('SUCCESS');
         setTimeout(() => {
           navigate('/booking/success', {

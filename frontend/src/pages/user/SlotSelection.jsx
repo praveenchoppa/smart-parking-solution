@@ -27,7 +27,7 @@ export default function SlotSelection() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Unable to load parking slots.");
+      setError(err.message || "Unable to load parking slots.");
     }
   };
 

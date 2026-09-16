@@ -14,28 +14,34 @@ export default function BookingSuccess() {
   const bookingId = location.state?.bookingId;
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!bookingId) {
-      // Fallback: try fetching current active booking
       bookingApi.getCurrentBooking().then((data) => {
         setBooking(data);
         setLoading(false);
-      }).catch(() => setLoading(false));
+      }).catch((err) => {
+        setLoading(false);
+        setError(err.message || "Unable to load booking confirmation.");
+      });
       return;
     }
 
     bookingApi.getBookingDetails(bookingId).then((data) => {
       setBooking(data);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((err) => {
+      setLoading(false);
+      setError(err.message || "Unable to load booking confirmation.");
+    });
   }, [bookingId]);
 
   if (loading) return <LoadingSpinner message="Fetching confirmed booking pass..." fullScreen />;
-  if (!booking) {
+  if (error || !booking) {
     return (
       <div className="text-center py-12">
-        <p className="text-slate-500 mb-4">No recent booking found.</p>
+        <p className="text-slate-500 mb-4">{error || "No recent booking found."}</p>
         <Link to="/home">
           <Button variant="primary">Return Home</Button>
         </Link>

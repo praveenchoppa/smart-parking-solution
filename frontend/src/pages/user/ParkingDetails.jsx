@@ -33,7 +33,7 @@ export default function ParkingDetails() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Unable to load parking details.");
+      setError(err.message || "Unable to load parking details.");
     }
   };
 

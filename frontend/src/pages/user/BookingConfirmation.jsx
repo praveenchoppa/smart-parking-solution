@@ -34,7 +34,7 @@ export default function BookingConfirmation() {
         setLoading(false);
       } catch (err) {
         setLoading(false);
-        setErrorMsg("Unable to retrieve parking details.");
+        setErrorMsg(err.message || "Unable to retrieve parking details.");
       }
     };
 
@@ -49,7 +49,7 @@ export default function BookingConfirmation() {
     try {
       const response = await bookingApi.createBooking({
         parkingAreaId: Number(parkingAreaId),
-        parkingSlotId: selectedSlot.slotId,
+        parkingSlotId: selectedSlot.slotId ?? selectedSlot.id,
         vehicleId: selectedVehicle.id,
         durationHours: Number(durationHours)
       });

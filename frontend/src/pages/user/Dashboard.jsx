@@ -61,7 +61,7 @@ export default function Dashboard() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Unable to load nearby parking data. Please try again.");
+      setError(err.message || "Unable to load nearby parking data. Please try again.");
     }
   };
 

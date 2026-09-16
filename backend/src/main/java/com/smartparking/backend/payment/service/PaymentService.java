@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 
+import com.smartparking.backend.auth.security.SecurityUtils;
 import com.smartparking.backend.booking.entity.Booking;
 import com.smartparking.backend.booking.entity.BookingStatus;
 import com.smartparking.backend.booking.repository.BookingRepository;
@@ -28,6 +29,7 @@ public class PaymentService {
 
     public PaymentResponse makeSimulatedPayment(CreatePaymentRequest request) {
         Booking booking = findBookingOrThrow(request.getBookingId());
+        SecurityUtils.requireSelfOrAdmin(booking.getUser().getId());
 
         if (paymentRepository.existsByBookingId(booking.getId())) {
             throw new DuplicateResourceException("Payment", "bookingId", booking.getId());
@@ -57,7 +59,8 @@ public class PaymentService {
     }
 
     public PaymentResponse getPaymentByBookingId(Long bookingId) {
-        findBookingOrThrow(bookingId);
+        Booking booking = findBookingOrThrow(bookingId);
+        SecurityUtils.requireSelfOrAdmin(booking.getUser().getId());
 
         Payment payment = paymentRepository.findByBookingId(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", "bookingId", bookingId));

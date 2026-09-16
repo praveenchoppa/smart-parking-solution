@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-const ENABLE_MOCK = import.meta.env.VITE_ENABLE_MOCK_FALLBACK !== 'false';
+const ENABLE_MOCK = import.meta.env.VITE_ENABLE_MOCK_FALLBACK === 'true';
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -11,19 +11,37 @@ const apiClient = axios.create({
   timeout: 8000,
 });
 
-// Request Interceptor: Attach JWT Token if present
-apiClient.interceptors.request.use(
-  (config) => {
+function isPublicAuthUrl(url = '') {
+  return url.includes('/api/auth/login') || url.includes('/api/auth/register');
+}
+
+apiClient.interceptors.request.use((config) => {
+  if (!isPublicAuthUrl(config.url)) {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    return config;
-  },
-  (error) => Promise.reject(error)
+  }
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    if (status === 401 && !isPublicAuthUrl(url)) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      const path = window.location.pathname;
+      if (path !== '/login' && path !== '/register') {
+        window.location.assign('/login');
+      }
+    }
+    return Promise.reject(error);
+  }
 );
 
-// Helper function to extract user-friendly error messages
 export const extractErrorMessage = (error) => {
   if (error.response) {
     const status = error.response.status;
@@ -33,7 +51,7 @@ export const extractErrorMessage = (error) => {
       return message || "This slot was just booked by another user. Please select another slot.";
     }
     if (status === 401) {
-      return "Session expired or invalid credentials. Please log in again.";
+      return message || "Session expired or invalid credentials. Please log in again.";
     }
     if (status === 403) {
       return "Access denied. You do not have permission to access this resource.";
@@ -49,9 +67,28 @@ export const extractErrorMessage = (error) => {
     }
     return message || `Request failed with status ${status}`;
   } else if (error.request) {
-    return "Unable to reach Spring Boot backend server. (Offline Mode Active)";
+    return "Unable to reach Spring Boot backend server.";
   }
   return error.message || "An unexpected error occurred.";
 };
+
+export function throwApiError(error) {
+  const err = new Error(extractErrorMessage(error));
+  err.response = error.response;
+  err.status = error.response?.status;
+  throw err;
+}
+
+export function getCurrentUserId() {
+  const saved = localStorage.getItem('user');
+  if (!saved) {
+    throw new Error('No active user session. Please log in.');
+  }
+  const user = JSON.parse(saved);
+  if (!user?.id) {
+    throw new Error('No active user session. Please log in.');
+  }
+  return user.id;
+}
 
 export { apiClient, BASE_URL, ENABLE_MOCK };

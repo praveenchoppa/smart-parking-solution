@@ -1,48 +1,42 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { authApi } from '../services/api/authApi';
 
 const AuthContext = createContext(null);
 
+function readStoredUser() {
+  const savedUser = localStorage.getItem('user');
+  return savedUser ? JSON.parse(savedUser) : null;
+}
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem('token') || null;
-  });
-
+  const [user, setUser] = useState(readStoredUser);
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('token', token);
+  const persistSession = (nextToken, nextUser) => {
+    setToken(nextToken);
+    setUser(nextUser);
+    if (nextToken && nextUser) {
+      localStorage.setItem('token', nextToken);
+      localStorage.setItem('user', JSON.stringify(nextUser));
     } else {
       localStorage.removeItem('token');
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
       localStorage.removeItem('user');
     }
-  }, [user]);
+  };
 
   const login = async (credentials) => {
     setLoading(true);
     setError(null);
     try {
       const data = await authApi.login(credentials);
-      setToken(data.token);
-      setUser(data.user);
+      persistSession(data.token, data.user);
       setLoading(false);
       return data.user;
     } catch (err) {
       setLoading(false);
+      persistSession(null, null);
       const errMsg = err.message || "Invalid email or password.";
       setError(errMsg);
       throw new Error(errMsg);
@@ -54,8 +48,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const data = await authApi.register(userData);
-      setToken(data.token);
-      setUser(data.user);
+      persistSession(data.token, data.user);
       setLoading(false);
       return data.user;
     } catch (err) {
@@ -67,13 +60,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    persistSession(null, null);
   };
 
-  const isAuthenticated = Boolean(token && user);
+  const isAuthenticated = Boolean(token && user?.id);
   const isAdmin = Boolean(isAuthenticated && user?.role === 'ADMIN');
 
   return (

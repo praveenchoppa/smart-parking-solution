@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import com.smartparking.backend.auth.security.SecurityUtils;
 import com.smartparking.backend.user.dto.CreateUserRequest;
 import com.smartparking.backend.user.dto.UpdateUserRequest;
 import com.smartparking.backend.user.dto.UserResponse;
@@ -43,6 +44,7 @@ public class UserController {
 
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
+        SecurityUtils.requireSelfOrAdmin(id);
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
