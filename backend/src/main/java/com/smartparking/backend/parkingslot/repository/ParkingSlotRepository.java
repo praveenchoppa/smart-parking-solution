@@ -16,4 +16,6 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
     boolean existsByParkingAreaIdAndSlotNumberAndIdNot(Long parkingAreaId, String slotNumber, Long id);
 
     Optional<ParkingSlot> findByIdAndParkingAreaId(Long id, Long parkingAreaId);
+
+    void deleteByParkingAreaId(Long parkingAreaId);
 }

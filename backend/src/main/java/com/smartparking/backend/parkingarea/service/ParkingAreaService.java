@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.smartparking.backend.booking.repository.BookingRepository;
+import com.smartparking.backend.common.exception.InvalidOperationException;
 import com.smartparking.backend.common.exception.ResourceNotFoundException;
 import com.smartparking.backend.common.util.GeoUtils;
 import com.smartparking.backend.parkingarea.dto.CreateParkingAreaRequest;
@@ -13,6 +15,7 @@ import com.smartparking.backend.parkingarea.dto.ParkingAreaResponse;
 import com.smartparking.backend.parkingarea.dto.UpdateParkingAreaRequest;
 import com.smartparking.backend.parkingarea.entity.ParkingArea;
 import com.smartparking.backend.parkingarea.repository.ParkingAreaRepository;
+import com.smartparking.backend.parkingslot.repository.ParkingSlotRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,8 +24,12 @@ import lombok.RequiredArgsConstructor;
 public class ParkingAreaService {
 
     private static final double DEFAULT_RADIUS_METERS = 500.0;
+    private static final String DELETE_BLOCKED_BY_BOOKINGS =
+            "Cannot delete parking area because it has booking history. Deactivate it instead.";
 
     private final ParkingAreaRepository parkingAreaRepository;
+    private final ParkingSlotRepository parkingSlotRepository;
+    private final BookingRepository bookingRepository;
 
     public ParkingAreaResponse createParkingArea(CreateParkingAreaRequest request) {
         ParkingArea parkingArea = ParkingArea.builder()
@@ -85,9 +92,13 @@ public class ParkingAreaService {
     }
 
     public void deleteParkingArea(Long id) {
-        if (!parkingAreaRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Parking area", "id", id);
+        findParkingAreaOrThrow(id);
+
+        if (bookingRepository.existsByParkingAreaId(id)) {
+            throw new InvalidOperationException(DELETE_BLOCKED_BY_BOOKINGS);
         }
+
+        parkingSlotRepository.deleteByParkingAreaId(id);
         parkingAreaRepository.deleteById(id);
     }
 
