@@ -11,6 +11,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { parkingApi } from '../../services/api/parkingApi';
+import { recommendApi } from '../../services/api/recommendApi';
 import { getCurrentLocation } from '../../utils/location';
 import ParkingCard from '../../components/parking/ParkingCard';
 import RecommendationBanner from '../../components/common/RecommendationBanner';
@@ -35,23 +36,31 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const data = await parkingApi.getNearbyParkingAreas({
-        latitude: lat,
-        longitude: lng,
-        radius: r
-      });
+      const [data, ai2Recommendation] = await Promise.all([
+        parkingApi.getNearbyParkingAreas({
+          latitude: lat,
+          longitude: lng,
+          radius: r
+        }),
+        recommendApi.getRecommendation({
+          latitude: lat,
+          longitude: lng,
+          radius: r
+        }).catch(() => ({ recommendationAvailable: false }))
+      ]);
 
       setParkingAreas(data || []);
 
-      // Extract AI-2 recommendation if attached by backend response
-      const recommended = data?.find((p) => p.recommendationAvailable) || (data.length > 0 ? {
-        recommendationAvailable: true,
-        recommendedParkingAreaId: data[0].id,
-        score: data[0].recommendationScore || 0.92,
-        reason: data[0].recommendationReason || "Nearby parking with optimal slot availability"
-      } : null);
-
-      setRecommendation(recommended);
+      if (ai2Recommendation?.recommendationAvailable) {
+        setRecommendation({
+          recommendationAvailable: true,
+          recommendedParkingAreaId: ai2Recommendation.recommendedParkingAreaId,
+          score: ai2Recommendation.score,
+          reason: ai2Recommendation.reason
+        });
+      } else {
+        setRecommendation(null);
+      }
       setLoading(false);
     } catch (err) {
       setLoading(false);

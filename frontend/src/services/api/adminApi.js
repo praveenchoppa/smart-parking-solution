@@ -224,6 +224,15 @@ export const adminApi = {
     }
   },
 
+  syncAi1Occupancy: async (parkingAreaId) => {
+    try {
+      const response = await apiClient.post(`/api/ai/ai1/parking-areas/${parkingAreaId}/sync`);
+      return response.data;
+    } catch (error) {
+      throwApiError(error);
+    }
+  },
+
   getAllBookings: async () => {
     try {
       return await fetchAllBookings();
