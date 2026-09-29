@@ -8,9 +8,14 @@ import pandas as pd
 # --------------------------------------------------
 
 CURRENT_DIR = Path(__file__).resolve().parent
-MODEL_PATH = CURRENT_DIR.parent / "models" / "occupancy_model.pkl"
 
-# Load trained model
+MODEL_PATH = (
+    CURRENT_DIR.parent /
+    "models" /
+    "occupancy_model.pkl"
+)
+
+# Load trained V2 model
 model = joblib.load(MODEL_PATH)
 
 
@@ -23,10 +28,11 @@ def predict_occupancy(
     time,
     parking_area_id,
     total_slots,
-    previous_occupancy
+    previous_occupancy,
+    current_occupancy
 ):
     """
-    Predict parking occupancy.
+    Predict next-hour parking occupancy.
 
     Parameters
     ----------
@@ -34,7 +40,7 @@ def predict_occupancy(
         Date in YYYY-MM-DD format.
 
     time : str
-        Time in HH:MM format.
+        Current time in HH:MM format.
 
     parking_area_id : str
         Parking area identifier such as A01, A02, etc.
@@ -43,7 +49,10 @@ def predict_occupancy(
         Total parking slots.
 
     previous_occupancy : float
-        Previous occupancy percentage.
+        Occupancy percentage at the previous time period.
+
+    current_occupancy : float
+        Current occupancy percentage.
 
     Returns
     -------
@@ -52,58 +61,130 @@ def predict_occupancy(
         and available slots.
     """
 
-    # Convert date
-    date = pd.to_datetime(date)
+    # --------------------------------------------------
+    # INPUT VALIDATION
+    # --------------------------------------------------
 
-    # Extract time features
-    hour = pd.to_datetime(time).hour
+    if not 0 <= previous_occupancy <= 100:
+        raise ValueError(
+            "previous_occupancy must be between 0 and 100"
+        )
 
-    # Extract month
+    if not 0 <= current_occupancy <= 100:
+        raise ValueError(
+            "current_occupancy must be between 0 and 100"
+        )
+
+    if total_slots <= 0:
+        raise ValueError(
+            "total_slots must be greater than 0"
+        )
+
+    # --------------------------------------------------
+    # DATE AND TIME FEATURES
+    # --------------------------------------------------
+
+    date = pd.to_datetime(
+        date,
+        format="%Y-%m-%d"
+    )
+
+    time_value = pd.to_datetime(
+        time,
+        format="%H:%M"
+    )
+
+    hour = time_value.hour
+
     month = date.month
 
-    # Monday = 1 ... Sunday = 7
-    day_of_week_num = date.dayofweek + 1
+    # Training data uses:
+    # Monday = 0 ... Sunday = 6
+    day_of_week_num = date.dayofweek
 
-    # Weekend flag
-    is_weekend = 1 if day_of_week_num >= 6 else 0
+    # Training data uses:
+    # Monday-Friday = 0
+    # Saturday-Sunday = 1
+    is_weekend = (
+        1 if day_of_week_num >= 5 else 0
+    )
 
-    # Create input dataframe
+    # --------------------------------------------------
+    # V2 FEATURE
+    # --------------------------------------------------
+
+    occupancy_change = (
+        current_occupancy -
+        previous_occupancy
+    )
+
+    # --------------------------------------------------
+    # CREATE INPUT DATAFRAME
+    # --------------------------------------------------
+
     input_data = pd.DataFrame([{
         "hour": hour,
         "day_of_week_num": day_of_week_num,
         "is_weekend": is_weekend,
         "month": month,
         "previous_occupancy": previous_occupancy,
+        "current_occupancy": current_occupancy,
+        "occupancy_change": occupancy_change,
         "total_slots": total_slots
     }])
 
-    # Find parking-area columns used during training
+    # --------------------------------------------------
+    # PARKING AREA ENCODING
+    # --------------------------------------------------
+
     parking_columns = [
         column
         for column in model.feature_names_in_
         if column.startswith("parking_area_id_")
     ]
 
-    # Initialize all parking-area columns to 0
+    # A01 is the baseline category because
+    # drop_first=True was used during training.
+    known_areas = {"A01"}
+
     for column in parking_columns:
-        input_data[column] = 0
+        known_areas.add(
+            column.replace(
+                "parking_area_id_",
+                ""
+            )
+        )
 
-    # Activate selected parking area
-    parking_column = f"parking_area_id_{parking_area_id}"
-
-    if parking_column in input_data.columns:
-        input_data[parking_column] = 1
-    else:
+    if parking_area_id not in known_areas:
         raise ValueError(
             f"Unknown parking area: {parking_area_id}"
         )
 
-    # Ensure exact same feature order as training
+    # Initialize parking-area dummy columns
+    for column in parking_columns:
+        input_data[column] = 0
+
+    # Activate selected area
+    # A01 is represented by all zeros.
+    if parking_area_id != "A01":
+        parking_column = (
+            f"parking_area_id_{parking_area_id}"
+        )
+
+        input_data[parking_column] = 1
+
+    # --------------------------------------------------
+    # MATCH TRAINING FEATURE ORDER
+    # --------------------------------------------------
+
     input_data = input_data[
         model.feature_names_in_
     ]
 
-    # Make prediction
+    # --------------------------------------------------
+    # PREDICTION
+    # --------------------------------------------------
+
     predicted_occupancy = model.predict(
         input_data
     )[0]
@@ -114,21 +195,38 @@ def predict_occupancy(
         min(100, predicted_occupancy)
     )
 
-    # Calculate occupied slots
+    # --------------------------------------------------
+    # CALCULATE SLOTS
+    # --------------------------------------------------
+
     predicted_occupied_slots = round(
-        total_slots * predicted_occupancy / 100
+        total_slots *
+        predicted_occupancy /
+        100
     )
 
-    # Calculate available slots
     available_slots = (
-        total_slots - predicted_occupied_slots
+        total_slots -
+        predicted_occupied_slots
     )
+
+    # --------------------------------------------------
+    # RETURN RESULT
+    # --------------------------------------------------
 
     return {
         "predicted_occupancy": float(
-            round(predicted_occupancy, 2)
+            round(
+                predicted_occupancy,
+                2
+            )
+        ),
+        "predicted_occupied_slots": int(
+            predicted_occupied_slots
         ),
         "available_slots": int(
             available_slots
         )
     }
+
+

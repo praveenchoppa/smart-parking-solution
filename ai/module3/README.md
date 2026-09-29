@@ -1,120 +1,88 @@
-# Smart Parking — Occupancy Prediction
+# AI Module 3 — Parking Occupancy Prediction
 
-## Module 3 — AI-3
+## 1. Overview
 
-This module predicts parking occupancy using historical parking data.
+AI Module 3 predicts the occupancy of a parking area for the next time period.
 
-## Pipeline
+Unlike the parking slot detection module, which determines the current parking situation, this module focuses on predicting future occupancy.
 
-Historical Parking Data
-        ↓
-Data Preprocessing
-        ↓
-Feature Engineering
-        ↓
-Exploratory Data Analysis
-        ↓
-Model Training
-        ↓
-Model Evaluation
-        ↓
-Best Model
-        ↓
-Occupancy Prediction
+The prediction is primarily intended for the Admin Dashboard and analytics.
 
-## Dataset
+---
 
-The master parking dataset contains:
+## 2. Objective
 
-- date
-- time
-- day_of_week
-- day_of_week_num
-- is_weekend
-- parking_area_id
-- total_slots
-- occupied_slots
-- available
-- occupancy
-- distance
-- price
-- user_selected
+The objective of this module is to predict:
 
-For Module 3, the occupancy prediction model uses the relevant parking/time/history features rather than the recommendation-specific fields.
+> **Next-hour parking occupancy percentage for a selected parking area.**
 
-## Features Used
+The model uses historical occupancy, current occupancy, time-related features, parking area information, and parking capacity.
 
-The model uses:
+The output includes:
 
-- hour
-- day_of_week_num
-- is_weekend
-- month
-- previous_occupancy
-- total_slots
-- parking_area_id
+- Predicted occupancy percentage
+- Predicted occupied slots
+- Predicted available slots
 
-## Target
+---
+
+## 3. Dataset
+
+The module uses a prepared/simulated parking dataset for prototype development.
+
+Dataset characteristics:
+
+- 31,025 records
+- 5 parking areas
+- Hourly parking observations
+- Date and time information
+- Occupancy information
+- Parking capacity information
+
+### Dataset fields
+
+| Field | Description |
+|---|---|
+| `date` | Date of parking observation |
+| `time` | Time of observation |
+| `day_of_week` | Day name |
+| `day_of_week_num` | Numerical day-of-week feature |
+| `is_weekend` | Weekend indicator |
+| `parking_area_id` | Parking area identifier |
+| `total_slots` | Total parking capacity |
+| `occupied_slots` | Currently occupied slots |
+| `available` | Available parking slots |
+| `occupancy` | Occupancy percentage |
+| `distance` | Distance-related parking information |
+| `price` | Parking price |
+| `user_selected` | User selection information |
+
+> The dataset is prepared/simulated for prototype evaluation. Model performance should not be interpreted as real-world parking accuracy.
+
+---
+
+## 4. Data Preprocessing
+
+The following preprocessing steps were performed:
+
+1. Loaded the parking dataset.
+2. Checked dataset shape and data types.
+3. Checked for missing values.
+4. Checked for duplicate records.
+5. Validated parking slot consistency.
+6. Validated occupancy values.
+7. Converted date and time into usable features.
+8. Sorted records chronologically for each parking area.
+9. Created previous occupancy features.
+10. Created the next-hour occupancy target.
+11. Removed records without the required historical/future values.
+12. Applied one-hot encoding to the parking area.
+
+---
+
+## 5. Target Variable
 
 The target variable is:
 
-`target_occupancy`
-
-The target represents the occupancy at the next recorded time period for the same parking area.
-
-## Models Tested
-
-Three regression models were evaluated:
-
-1. Linear Regression
-2. Random Forest Regressor
-3. Gradient Boosting Regressor
-
-## Evaluation Metrics
-
-The models were evaluated using:
-
-- MAE
-- RMSE
-- R² Score
-
-## Selected Model
-
-Gradient Boosting Regressor
-
-Test performance:
-
-- MAE: 3.434
-- RMSE: 4.322
-- R²: 0.898
-
-## Saved Model
-
-The trained model is saved as:
-
-`models/occupancy_model.pkl`
-
-## Prediction Function
-
-The prediction module provides:
-
-`predict_occupancy()`
-
-Inputs:
-
-- date
-- time
-- parking_area_id
-- total_slots
-- previous_occupancy
-
-Example:
-
-```python
-result = predict_occupancy(
-    date="2026-10-01",
-    time="18:00",
-    parking_area_id="A01",
-    total_slots=100,
-    previous_occupancy=65
-)
+```text
+target_occupancy
