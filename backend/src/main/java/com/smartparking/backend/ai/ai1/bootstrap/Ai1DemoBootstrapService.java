@@ -151,13 +151,24 @@ public class Ai1DemoBootstrapService {
     }
 
     private void syncParkingAreaSequence() {
-        entityManager.createNativeQuery("""
-                SELECT setval(
-                    pg_get_serial_sequence('parking_areas', 'id'),
-                    GREATEST((SELECT COALESCE(MAX(id), 1) FROM parking_areas), 1)
-                )
-                """)
-                .getSingleResult();
+        try {
+            org.hibernate.Session session = entityManager.unwrap(org.hibernate.Session.class);
+            session.doWork(connection -> {
+                String dbName = connection.getMetaData().getDatabaseProductName();
+                if (dbName != null && dbName.toLowerCase(Locale.ROOT).contains("postgresql")) {
+                    try (java.sql.Statement stmt = connection.createStatement()) {
+                        stmt.executeQuery("""
+                                SELECT setval(
+                                    pg_get_serial_sequence('parking_areas', 'id'),
+                                    GREATEST((SELECT COALESCE(MAX(id), 1) FROM parking_areas), 1)
+                                )
+                                """);
+                    }
+                }
+            });
+        } catch (Exception ex) {
+            log.debug("Sequence sync skipped for non-PostgreSQL DB: {}", ex.getMessage());
+        }
     }
 
     static String formatAi1SlotNumber(int slotIndex) {
