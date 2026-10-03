@@ -5,6 +5,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.smartparking.backend.ai.ai1.client.Ai1Client;
@@ -20,8 +23,11 @@ import com.smartparking.backend.parkingslot.entity.SlotStatus;
 import com.smartparking.backend.parkingslot.repository.ParkingSlotRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
+@EnableScheduling
 @RequiredArgsConstructor
 public class Ai1OccupancyService {
 
@@ -29,6 +35,32 @@ public class Ai1OccupancyService {
     private final ParkingAreaRepository parkingAreaRepository;
     private final ParkingSlotRepository parkingSlotRepository;
     private final Ai1SlotStatusMapper slotStatusMapper;
+
+    @Value("${app.ai1.scheduled-sync.enabled:true}")
+    private boolean scheduledSyncEnabled;
+
+    @Scheduled(fixedRateString = "${app.ai1.scheduled-sync-interval-ms:10000}")
+    public void scheduledOccupancySync() {
+        if (!scheduledSyncEnabled) {
+            return;
+        }
+
+        try {
+            List<Ai1AreaInfoDto> areas = ai1Client.fetchAreas();
+            if (areas == null || areas.isEmpty()) {
+                return;
+            }
+
+            for (Ai1AreaInfoDto area : areas) {
+                Long areaId = area.getId();
+                if (areaId != null && parkingAreaRepository.existsById(areaId)) {
+                    syncParkingAreaOccupancy(areaId);
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Scheduled AI-1 occupancy sync skipped: {}", ex.getMessage());
+        }
+    }
 
     public List<Ai1AreaInfoDto> getAi1Areas() {
         return ai1Client.fetchAreas();
