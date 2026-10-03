@@ -377,11 +377,11 @@ export const adminApi = {
         predictedOccupiedSlots: predictedOccupied,
         availableSlots: availableSlots,
         hourlyPredictions: [
-          { time: "09:00 AM", occupancy: Math.max(10, predictedOccupancy - 20) },
-          { time: "12:00 PM", occupancy: Math.max(20, predictedOccupancy - 10) },
-          { time: "03:00 PM", occupancy: predictedOccupancy },
-          { time: "06:00 PM", occupancy: Math.min(100, predictedOccupancy + 15) },
-          { time: "09:00 PM", occupancy: Math.max(15, predictedOccupancy - 25) }
+          { time: "09:00 AM", occupancy: Math.max(10, predictedOccupancy - 20), occupancyPercentage: Math.max(10, predictedOccupancy - 20) },
+          { time: "12:00 PM", occupancy: Math.max(20, predictedOccupancy - 10), occupancyPercentage: Math.max(20, predictedOccupancy - 10) },
+          { time: "03:00 PM", occupancy: predictedOccupancy, occupancyPercentage: predictedOccupancy },
+          { time: "06:00 PM", occupancy: Math.min(100, predictedOccupancy + 15), occupancyPercentage: Math.min(100, predictedOccupancy + 15) },
+          { time: "09:00 PM", occupancy: Math.max(15, predictedOccupancy - 25), occupancyPercentage: Math.max(15, predictedOccupancy - 25) }
         ]
       };
     } catch (error) {

@@ -43,7 +43,7 @@ public class Ai1DemoBootstrapService {
                 int createdCount = 0;
                 for (com.smartparking.backend.ai.ai1.dto.Ai1AreaInfoDto areaDto : ai1Areas) {
                     Long areaId = areaDto.getId();
-                    if (areaId != null && !parkingAreaRepository.existsById(areaId)) {
+                    if (areaId != null && !parkingAreaRepository.existsByAi1AreaId(areaId) && !parkingAreaRepository.existsById(areaId)) {
                         String name = areaDto.getName() != null ? areaDto.getName() : "Parking Area " + areaId;
                         int totalSlots = areaDto.getTotalSlots() != null ? areaDto.getTotalSlots() : 69;
                         insertDynamicParkingArea(areaId, name, totalSlots);
@@ -59,7 +59,7 @@ public class Ai1DemoBootstrapService {
             log.warn("AI-1 area discovery during bootstrap skipped (AI-1 offline): {}. Using static fallback if needed.", ex.getMessage());
         }
 
-        if (parkingAreaRepository.existsById(DEMO_PARKING_AREA_ID)) {
+        if (parkingAreaRepository.existsByAi1AreaId(DEMO_PARKING_AREA_ID) || parkingAreaRepository.existsById(DEMO_PARKING_AREA_ID)) {
             return validateExistingDemoArea();
         }
 
@@ -76,8 +76,8 @@ public class Ai1DemoBootstrapService {
 
     private void insertDynamicParkingArea(Long id, String name, int totalSlots) {
         entityManager.createNativeQuery("""
-                INSERT INTO parking_areas (id, name, address, latitude, longitude, hourly_rate, total_slots)
-                VALUES (:id, :name, :address, :latitude, :longitude, :hourlyRate, :totalSlots)
+                INSERT INTO parking_areas (id, name, address, latitude, longitude, hourly_rate, total_slots, ai1_area_id)
+                VALUES (:id, :name, :address, :latitude, :longitude, :hourlyRate, :totalSlots, :ai1AreaId)
                 """)
                 .setParameter("id", id)
                 .setParameter("name", name)
@@ -86,12 +86,13 @@ public class Ai1DemoBootstrapService {
                 .setParameter("longitude", 77.5946 + (id * 0.005))
                 .setParameter("hourlyRate", 40.0)
                 .setParameter("totalSlots", totalSlots)
+                .setParameter("ai1AreaId", id)
                 .executeUpdate();
         entityManager.flush();
     }
 
     private void createDynamicSlots(Long areaId, int totalSlots) {
-        ParkingArea parkingArea = parkingAreaRepository.findById(areaId).orElseThrow();
+        ParkingArea parkingArea = parkingAreaRepository.findByAi1AreaIdOrId(areaId).orElseThrow();
 
         IntStream.rangeClosed(1, totalSlots)
                 .mapToObj(slotIndex -> ParkingSlot.builder()
@@ -103,8 +104,8 @@ public class Ai1DemoBootstrapService {
     }
 
     private BootstrapResult validateExistingDemoArea() {
-        ParkingArea area = parkingAreaRepository.findById(DEMO_PARKING_AREA_ID).orElseThrow();
-        List<ParkingSlot> slots = parkingSlotRepository.findByParkingAreaId(DEMO_PARKING_AREA_ID);
+        ParkingArea area = parkingAreaRepository.findByAi1AreaIdOrId(DEMO_PARKING_AREA_ID).orElseThrow();
+        List<ParkingSlot> slots = parkingSlotRepository.findByParkingAreaId(area.getId());
 
         if (isValidAi1DemoArea(area, slots)) {
             log.info(
@@ -124,8 +125,8 @@ public class Ai1DemoBootstrapService {
 
     private void insertDemoParkingArea() {
         entityManager.createNativeQuery("""
-                INSERT INTO parking_areas (id, name, address, latitude, longitude, hourly_rate, total_slots)
-                VALUES (:id, :name, :address, :latitude, :longitude, :hourlyRate, :totalSlots)
+                INSERT INTO parking_areas (id, name, address, latitude, longitude, hourly_rate, total_slots, ai1_area_id)
+                VALUES (:id, :name, :address, :latitude, :longitude, :hourlyRate, :totalSlots, :ai1AreaId)
                 """)
                 .setParameter("id", DEMO_PARKING_AREA_ID)
                 .setParameter("name", DEMO_AREA_NAME)
@@ -134,6 +135,7 @@ public class Ai1DemoBootstrapService {
                 .setParameter("longitude", 77.5946)
                 .setParameter("hourlyRate", 40.0)
                 .setParameter("totalSlots", DEMO_SLOT_COUNT)
+                .setParameter("ai1AreaId", DEMO_PARKING_AREA_ID)
                 .executeUpdate();
         entityManager.flush();
     }

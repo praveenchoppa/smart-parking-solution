@@ -42,4 +42,7 @@ public class ParkingArea {
 
     @Column(name = "total_slots", nullable = false)
     private Integer totalSlots;
+
+    @Column(name = "ai1_area_id", unique = true)
+    private Long ai1AreaId;
 }

@@ -37,6 +37,7 @@ public class Ai1OccupancyService {
     private final Ai1SlotStatusMapper slotStatusMapper;
 
     private final java.util.concurrent.atomic.AtomicInteger consecutiveFailures = new java.util.concurrent.atomic.AtomicInteger(0);
+    private volatile long nextAllowedSyncTimeMs = 0;
 
     @Value("${app.ai1.scheduled-sync.enabled:true}")
     private boolean scheduledSyncEnabled;
@@ -47,35 +48,46 @@ public class Ai1OccupancyService {
             return;
         }
 
-        int failures = consecutiveFailures.get();
-        if (failures > 1) {
-            int skipCycles = Math.min(failures, 6);
-            if ((System.currentTimeMillis() / 1000) % skipCycles != 0) {
-                return;
-            }
+        long now = System.currentTimeMillis();
+        if (now < nextAllowedSyncTimeMs) {
+            return;
         }
 
         try {
             List<Ai1AreaInfoDto> areas = ai1Client.fetchAreas();
             if (areas != null && !areas.isEmpty()) {
                 for (Ai1AreaInfoDto area : areas) {
-                    Long areaId = area.getId();
-                    if (areaId != null && parkingAreaRepository.existsById(areaId)) {
-                        syncParkingAreaOccupancy(areaId);
+                    Long ai1AreaId = area.getId();
+                    if (ai1AreaId != null) {
+                        parkingAreaRepository.findByAi1AreaIdOrId(ai1AreaId)
+                                .ifPresent(pa -> syncParkingAreaOccupancy(ai1AreaId));
                     }
                 }
             }
 
-            if (consecutiveFailures.getAndSet(0) > 0) {
+            int prevFailures = consecutiveFailures.getAndSet(0);
+            nextAllowedSyncTimeMs = 0;
+            if (prevFailures > 0) {
                 log.info("AI-1 service reconnected successfully. Scheduled occupancy sync resumed for all areas.");
             }
         } catch (Exception ex) {
-            int newFailures = consecutiveFailures.incrementAndGet();
-            if (newFailures == 1) {
-                log.warn("AI-1 service is unreachable: {}. Entering backoff mode for scheduled occupancy sync.", ex.getMessage());
-            } else if (newFailures % 5 == 0) {
-                log.warn("AI-1 service remains unreachable (consecutive failures: {}). Scheduled sync in backoff mode.", newFailures);
+            int failureCount = consecutiveFailures.incrementAndGet();
+
+            long backoffSeconds;
+            if (failureCount == 1) {
+                backoffSeconds = 15;
+            } else if (failureCount == 2) {
+                backoffSeconds = 30;
+            } else if (failureCount == 3) {
+                backoffSeconds = 60;
+            } else {
+                backoffSeconds = 120;
             }
+
+            nextAllowedSyncTimeMs = System.currentTimeMillis() + (backoffSeconds * 1000L);
+
+            log.warn("AI-1 service is unreachable: {}. Failure #{} — entering exponential backoff stage (next retry in {}s).",
+                    ex.getMessage(), failureCount, backoffSeconds);
         }
     }
 
@@ -84,16 +96,18 @@ public class Ai1OccupancyService {
     }
 
     public Ai1OccupancyResponse getAi1Occupancy(Long parkingAreaId) {
-        verifyParkingAreaExists(parkingAreaId);
-        return ai1Client.fetchOccupancy(parkingAreaId);
+        com.smartparking.backend.parkingarea.entity.ParkingArea area = resolveParkingArea(parkingAreaId);
+        Long ai1AreaId = area.getAi1AreaId() != null ? area.getAi1AreaId() : parkingAreaId;
+        return ai1Client.fetchOccupancy(ai1AreaId);
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public Ai1SyncResultResponse syncParkingAreaOccupancy(Long parkingAreaId) {
-        verifyParkingAreaExists(parkingAreaId);
+    public Ai1SyncResultResponse syncParkingAreaOccupancy(Long targetAreaId) {
+        com.smartparking.backend.parkingarea.entity.ParkingArea area = resolveParkingArea(targetAreaId);
+        Long ai1AreaId = area.getAi1AreaId() != null ? area.getAi1AreaId() : targetAreaId;
 
-        Ai1OccupancyResponse ai1Response = ai1Client.fetchOccupancy(parkingAreaId);
-        List<ParkingSlot> dbSlots = parkingSlotRepository.findByParkingAreaId(parkingAreaId);
+        Ai1OccupancyResponse ai1Response = ai1Client.fetchOccupancy(ai1AreaId);
+        List<ParkingSlot> dbSlots = parkingSlotRepository.findByParkingAreaId(area.getId());
         Map<String, ParkingSlot> slotsByNumber = indexSlotsByNormalizedNumber(dbSlots);
 
         int updatedSlots = 0;
@@ -133,12 +147,12 @@ public class Ai1OccupancyService {
             }
         }
 
-        List<ParkingSlotResponse> syncedSlots = parkingSlotRepository.findByParkingAreaId(parkingAreaId).stream()
+        List<ParkingSlotResponse> syncedSlots = parkingSlotRepository.findByParkingAreaId(area.getId()).stream()
                 .map(ParkingSlotResponse::fromEntity)
                 .toList();
 
         return Ai1SyncResultResponse.builder()
-                .parkingAreaId(parkingAreaId)
+                .parkingAreaId(area.getId())
                 .ai1Timestamp(ai1Response.getTimestamp())
                 .ai1Source(ai1Response.getSource())
                 .totalAiDetections(ai1Response.getSlots() != null ? ai1Response.getSlots().size() : 0)
@@ -148,6 +162,11 @@ public class Ai1OccupancyService {
                 .unmatchedAiSlotNumbers(unmatchedAiSlotNumbers)
                 .slots(syncedSlots)
                 .build();
+    }
+
+    private com.smartparking.backend.parkingarea.entity.ParkingArea resolveParkingArea(Long targetAreaId) {
+        return parkingAreaRepository.findByAi1AreaIdOrId(targetAreaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Parking area", "id", targetAreaId));
     }
 
     private Map<String, ParkingSlot> indexSlotsByNormalizedNumber(List<ParkingSlot> dbSlots) {
@@ -161,8 +180,6 @@ public class Ai1OccupancyService {
     }
 
     private void verifyParkingAreaExists(Long parkingAreaId) {
-        if (!parkingAreaRepository.existsById(parkingAreaId)) {
-            throw new ResourceNotFoundException("Parking area", "id", parkingAreaId);
-        }
+        resolveParkingArea(parkingAreaId);
     }
 }
