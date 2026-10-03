@@ -9,6 +9,7 @@ import java.util.stream.IntStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.smartparking.backend.ai.ai1.client.Ai1Client;
 import com.smartparking.backend.parkingarea.entity.ParkingArea;
 import com.smartparking.backend.parkingarea.repository.ParkingAreaRepository;
 import com.smartparking.backend.parkingslot.entity.ParkingSlot;
@@ -29,12 +30,35 @@ public class Ai1DemoBootstrapService {
     static final String DEMO_AREA_NAME = "City Mall Main Lot";
     static final String DEMO_AREA_ADDRESS = "AI-1 Demo Parking Area";
 
+    private final Ai1Client ai1Client;
     private final ParkingAreaRepository parkingAreaRepository;
     private final ParkingSlotRepository parkingSlotRepository;
     private final EntityManager entityManager;
 
     @Transactional
     public BootstrapResult ensureDemoParkingArea() {
+        try {
+            List<com.smartparking.backend.ai.ai1.dto.Ai1AreaInfoDto> ai1Areas = ai1Client.fetchAreas();
+            if (ai1Areas != null && !ai1Areas.isEmpty()) {
+                int createdCount = 0;
+                for (com.smartparking.backend.ai.ai1.dto.Ai1AreaInfoDto areaDto : ai1Areas) {
+                    Long areaId = areaDto.getId();
+                    if (areaId != null && !parkingAreaRepository.existsById(areaId)) {
+                        String name = areaDto.getName() != null ? areaDto.getName() : "Parking Area " + areaId;
+                        int totalSlots = areaDto.getTotalSlots() != null ? areaDto.getTotalSlots() : 69;
+                        insertDynamicParkingArea(areaId, name, totalSlots);
+                        createDynamicSlots(areaId, totalSlots);
+                        createdCount++;
+                    }
+                }
+                syncParkingAreaSequence();
+                log.info("AI-1 demo bootstrap completed dynamically for {} AI-1 areas.", ai1Areas.size());
+                return BootstrapResult.created(DEMO_PARKING_AREA_ID, ai1Areas.size());
+            }
+        } catch (Exception ex) {
+            log.warn("AI-1 area discovery during bootstrap skipped (AI-1 offline): {}. Using static fallback if needed.", ex.getMessage());
+        }
+
         if (parkingAreaRepository.existsById(DEMO_PARKING_AREA_ID)) {
             return validateExistingDemoArea();
         }
@@ -48,6 +72,34 @@ public class Ai1DemoBootstrapService {
                 DEMO_PARKING_AREA_ID,
                 DEMO_SLOT_COUNT);
         return BootstrapResult.created(DEMO_PARKING_AREA_ID, DEMO_SLOT_COUNT);
+    }
+
+    private void insertDynamicParkingArea(Long id, String name, int totalSlots) {
+        entityManager.createNativeQuery("""
+                INSERT INTO parking_areas (id, name, address, latitude, longitude, hourly_rate, total_slots)
+                VALUES (:id, :name, :address, :latitude, :longitude, :hourlyRate, :totalSlots)
+                """)
+                .setParameter("id", id)
+                .setParameter("name", name)
+                .setParameter("address", "AI-1 Configured Area " + id)
+                .setParameter("latitude", 12.9716 + (id * 0.005))
+                .setParameter("longitude", 77.5946 + (id * 0.005))
+                .setParameter("hourlyRate", 40.0)
+                .setParameter("totalSlots", totalSlots)
+                .executeUpdate();
+        entityManager.flush();
+    }
+
+    private void createDynamicSlots(Long areaId, int totalSlots) {
+        ParkingArea parkingArea = parkingAreaRepository.findById(areaId).orElseThrow();
+
+        IntStream.rangeClosed(1, totalSlots)
+                .mapToObj(slotIndex -> ParkingSlot.builder()
+                        .parkingArea(parkingArea)
+                        .slotNumber(formatAi1SlotNumber(slotIndex))
+                        .status(SlotStatus.AVAILABLE)
+                        .build())
+                .forEach(parkingSlotRepository::save);
     }
 
     private BootstrapResult validateExistingDemoArea() {

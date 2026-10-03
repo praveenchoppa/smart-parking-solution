@@ -32,7 +32,7 @@ spring.datasource.password=${DB_PASSWORD}
 - **Effect**: Guarantees that fresh database clones automatically contain Area 1 ready to sync with AI-1 (`carPark.mp4`) out of the box.
 
 ### 3. `AI1_SCHEDULED_SYNC_ENABLED` (Default: `true`)
-- **Behavior**: When set to `true`, Spring Boot executes a background `@Scheduled` task every 10,000 ms (`AI1_SCHEDULED_SYNC_INTERVAL_MS`).
+- **Behavior**: When set to `true`, Spring Boot executes a background `@Scheduled` task every 15,000 ms (`AI1_SCHEDULED_SYNC_INTERVAL_MS`, default 15s).
 - **Effect**: Periodically fetches AI-1 physical occupancy (`AVAILABLE`/`OCCUPIED`) and merges it into PostgreSQL without overwriting active user reservations (`RESERVED`).
 
 ### 4. ⚠️ `JWT_SECRET` Dev Fallback Security Warning

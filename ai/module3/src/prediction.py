@@ -61,9 +61,15 @@ def predict_occupancy(
         and available slots.
     """
 
-    # --------------------------------------------------
-    # INPUT VALIDATION
-    # --------------------------------------------------
+    # Normalize parking_area_id (e.g., 2, "2", "area-2", "A02" -> "A02")
+    if isinstance(parking_area_id, (int, float)) or (isinstance(parking_area_id, str) and parking_area_id.isdigit()):
+        parking_area_id = f"A{int(parking_area_id):02d}"
+    elif isinstance(parking_area_id, str) and parking_area_id.lower().startswith("area-"):
+        num_part = parking_area_id.lower().replace("area-", "")
+        if num_part.isdigit():
+            parking_area_id = f"A{int(num_part):02d}"
+    elif isinstance(parking_area_id, str):
+        parking_area_id = parking_area_id.upper()
 
     if not 0 <= previous_occupancy <= 100:
         raise ValueError(

@@ -13,8 +13,8 @@ public class Ai2ClientConfig {
 
     @Bean
     public RestClient ai2RestClient(
-            @Value("${app.ai2.base-url}") String baseUrl,
-            @Value("${app.ai2.timeout-ms}") int timeoutMs) {
+            @Value("${app.ai2.base-url:http://localhost:5001}") String baseUrl,
+            @Value("${app.ai2.timeout-ms:5000}") int timeoutMs) {
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofMillis(timeoutMs));

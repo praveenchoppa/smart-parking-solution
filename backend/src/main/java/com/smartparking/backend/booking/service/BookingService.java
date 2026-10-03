@@ -35,6 +35,8 @@ import com.smartparking.backend.vehicle.repository.VehicleRepository;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 @RequiredArgsConstructor
 public class BookingService {
@@ -50,11 +52,12 @@ public class BookingService {
     private final ParkingAreaRepository parkingAreaRepository;
     private final ParkingSlotRepository parkingSlotRepository;
 
+    @Transactional
     public BookingResponse createBooking(CreateBookingRequest request) {
         User user = findUserOrThrow(request.getUserId());
         Vehicle vehicle = findVehicleForUserOrThrow(request.getUserId(), request.getVehicleId());
         ParkingArea parkingArea = findParkingAreaOrThrow(request.getParkingAreaId());
-        ParkingSlot parkingSlot = findParkingSlotForAreaOrThrow(
+        ParkingSlot parkingSlot = findParkingSlotForAreaOrThrowWithLock(
                 request.getParkingAreaId(),
                 request.getParkingSlotId());
 
@@ -214,6 +217,19 @@ public class BookingService {
     private ParkingArea findParkingAreaOrThrow(Long parkingAreaId) {
         return parkingAreaRepository.findById(parkingAreaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Parking area", "id", parkingAreaId));
+    }
+
+    private ParkingSlot findParkingSlotForAreaOrThrowWithLock(Long parkingAreaId, Long parkingSlotId) {
+        ParkingSlot parkingSlot = parkingSlotRepository.findByParkingAreaIdAndIdWithLock(parkingAreaId, parkingSlotId)
+                .orElseGet(() -> parkingSlotRepository.findById(parkingSlotId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Parking slot", "id", parkingSlotId)));
+
+        if (!parkingSlot.getParkingArea().getId().equals(parkingAreaId)) {
+            throw new InvalidOperationException(
+                    "Parking slot does not belong to the specified parking area");
+        }
+
+        return parkingSlot;
     }
 
     private ParkingSlot findParkingSlotForAreaOrThrow(Long parkingAreaId, Long parkingSlotId) {

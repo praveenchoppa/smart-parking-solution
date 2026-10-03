@@ -36,29 +36,46 @@ public class Ai1OccupancyService {
     private final ParkingSlotRepository parkingSlotRepository;
     private final Ai1SlotStatusMapper slotStatusMapper;
 
+    private final java.util.concurrent.atomic.AtomicInteger consecutiveFailures = new java.util.concurrent.atomic.AtomicInteger(0);
+
     @Value("${app.ai1.scheduled-sync.enabled:true}")
     private boolean scheduledSyncEnabled;
 
-    @Scheduled(fixedRateString = "${app.ai1.scheduled-sync-interval-ms:10000}")
+    @Scheduled(fixedRateString = "${app.ai1.scheduled-sync-interval-ms:15000}")
     public void scheduledOccupancySync() {
         if (!scheduledSyncEnabled) {
             return;
         }
 
-        try {
-            List<Ai1AreaInfoDto> areas = ai1Client.fetchAreas();
-            if (areas == null || areas.isEmpty()) {
+        int failures = consecutiveFailures.get();
+        if (failures > 1) {
+            int skipCycles = Math.min(failures, 6);
+            if ((System.currentTimeMillis() / 1000) % skipCycles != 0) {
                 return;
             }
+        }
 
-            for (Ai1AreaInfoDto area : areas) {
-                Long areaId = area.getId();
-                if (areaId != null && parkingAreaRepository.existsById(areaId)) {
-                    syncParkingAreaOccupancy(areaId);
+        try {
+            List<Ai1AreaInfoDto> areas = ai1Client.fetchAreas();
+            if (areas != null && !areas.isEmpty()) {
+                for (Ai1AreaInfoDto area : areas) {
+                    Long areaId = area.getId();
+                    if (areaId != null && parkingAreaRepository.existsById(areaId)) {
+                        syncParkingAreaOccupancy(areaId);
+                    }
                 }
             }
+
+            if (consecutiveFailures.getAndSet(0) > 0) {
+                log.info("AI-1 service reconnected successfully. Scheduled occupancy sync resumed for all areas.");
+            }
         } catch (Exception ex) {
-            log.warn("Scheduled AI-1 occupancy sync skipped: {}", ex.getMessage());
+            int newFailures = consecutiveFailures.incrementAndGet();
+            if (newFailures == 1) {
+                log.warn("AI-1 service is unreachable: {}. Entering backoff mode for scheduled occupancy sync.", ex.getMessage());
+            } else if (newFailures % 5 == 0) {
+                log.warn("AI-1 service remains unreachable (consecutive failures: {}). Scheduled sync in backoff mode.", newFailures);
+            }
         }
     }
 
@@ -71,6 +88,7 @@ public class Ai1OccupancyService {
         return ai1Client.fetchOccupancy(parkingAreaId);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public Ai1SyncResultResponse syncParkingAreaOccupancy(Long parkingAreaId) {
         verifyParkingAreaExists(parkingAreaId);
 
@@ -85,12 +103,15 @@ public class Ai1OccupancyService {
         if (ai1Response.getSlots() != null) {
             for (Ai1DetectedSlotDto detectedSlot : ai1Response.getSlots()) {
                 String normalizedNumber = slotStatusMapper.normalizeSlotNumber(detectedSlot.getSlotNumber());
-                ParkingSlot parkingSlot = slotsByNumber.get(normalizedNumber);
+                ParkingSlot cachedSlot = slotsByNumber.get(normalizedNumber);
 
-                if (parkingSlot == null) {
+                if (cachedSlot == null) {
                     unmatchedAiSlotNumbers.add(detectedSlot.getSlotNumber());
                     continue;
                 }
+
+                // Re-fetch latest slot status from DB inside transaction to check concurrent updates
+                ParkingSlot parkingSlot = parkingSlotRepository.findById(cachedSlot.getId()).orElse(cachedSlot);
 
                 SlotStatus aiPhysicalStatus = slotStatusMapper.toPhysicalStatus(detectedSlot.getStatus());
                 SlotStatus mergedStatus = slotStatusMapper.mergeWithBusinessRules(
@@ -98,9 +119,14 @@ public class Ai1OccupancyService {
                         aiPhysicalStatus);
 
                 if (parkingSlot.getStatus() != mergedStatus) {
-                    parkingSlot.setStatus(mergedStatus);
-                    parkingSlotRepository.save(parkingSlot);
-                    updatedSlots++;
+                    try {
+                        parkingSlot.setStatus(mergedStatus);
+                        parkingSlotRepository.save(parkingSlot);
+                        updatedSlots++;
+                    } catch (org.springframework.orm.ObjectOptimisticLockingFailureException | jakarta.persistence.OptimisticLockException ex) {
+                        log.warn("Optimistic lock prevented sync update for slot {} (modified concurrently by booking). Preserving DB status.", parkingSlot.getSlotNumber());
+                        unchangedSlots++;
+                    }
                 } else {
                     unchangedSlots++;
                 }
