@@ -26,14 +26,21 @@ public class PaymentController {
     @PostMapping("/api/payments")
     public ResponseEntity<PaymentResponse> makeSimulatedPayment(
             @Valid @RequestBody CreatePaymentRequest request) {
+        return createdPaymentResponse(paymentService.makeSimulatedPayment(request));
+    }
 
-        PaymentResponse response = paymentService.makeSimulatedPayment(request);
+    @PostMapping("/api/bookings/{bookingId}/payment")
+    public ResponseEntity<PaymentResponse> payForBooking(@PathVariable Long bookingId) {
+        CreatePaymentRequest request = new CreatePaymentRequest();
+        request.setBookingId(bookingId);
+        return createdPaymentResponse(paymentService.makeSimulatedPayment(request));
+    }
 
+    private ResponseEntity<PaymentResponse> createdPaymentResponse(PaymentResponse response) {
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/api/bookings/{bookingId}/payment")
                 .buildAndExpand(response.getBookingId())
                 .toUri();
-
         return ResponseEntity.created(location).body(response);
     }
 

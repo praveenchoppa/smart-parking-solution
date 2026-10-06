@@ -1,4 +1,4 @@
-import { apiClient, ENABLE_MOCK, throwApiError, extractErrorMessage } from './apiClient';
+import { apiClient, shouldUseMock, throwApiError, extractErrorMessage } from './apiClient';
 import { sharedMockRepository, INITIAL_AI3_PREDICTIONS } from '../mock/mockData';
 import { parkingApi, fetchSlotsForArea, occupancyFromSlots, mapParkingArea } from './parkingApi';
 import { mapBooking } from './bookingApi';
@@ -26,11 +26,15 @@ async function fetchAllBookings() {
   return nested.flat();
 }
 
-async function createSlotsForArea(parkingAreaId, totalSlots) {
+async function createSlotsForArea(parkingAreaId, totalSlots, ai1AreaId = null) {
   const count = Number(totalSlots) || 0;
+  const useAi1Format = ai1AreaId != null;
   for (let i = 1; i <= count; i++) {
+    const slotNumber = useAi1Format
+      ? `A${String(i).padStart(2, '0')}`
+      : `S-${String(i).padStart(2, '0')}`;
     await apiClient.post(`/api/parking-areas/${parkingAreaId}/slots`, {
-      slotNumber: `S-${String(i).padStart(2, '0')}`,
+      slotNumber,
       status: 'AVAILABLE'
     });
   }
@@ -83,7 +87,7 @@ export const adminApi = {
         ai3Predictions
       };
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
         let totalSlots = 0;
         let availableSlots = 0;
@@ -118,7 +122,7 @@ export const adminApi = {
     try {
       return await parkingApi.getAllParkingAreas();
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 200));
         return sharedMockRepository.parkingAreas;
       }
@@ -131,11 +135,11 @@ export const adminApi = {
       const payload = toParkingAreaPayload(data);
       const response = await apiClient.post('/api/parking-areas', payload);
       const created = response.data;
-      await createSlotsForArea(created.id, created.totalSlots || payload.totalSlots);
+      await createSlotsForArea(created.id, created.totalSlots || payload.totalSlots, created.ai1AreaId);
       const slots = await fetchSlotsForArea(created.id);
       return mapParkingArea(created, occupancyFromSlots(slots, created.totalSlots));
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
 
         const trimmedName = (data.name || '').trim();
@@ -187,7 +191,7 @@ export const adminApi = {
       const slots = await fetchSlotsForArea(id);
       return mapParkingArea(response.data, occupancyFromSlots(slots, response.data.totalSlots));
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
         const idx = sharedMockRepository.parkingAreas.findIndex((p) => p.id === Number(id));
         if (idx !== -1) {
@@ -212,7 +216,7 @@ export const adminApi = {
       await apiClient.delete(`/api/parking-areas/${id}`);
       return { success: true };
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
         sharedMockRepository.parkingAreas = sharedMockRepository.parkingAreas.filter((p) => p.id !== Number(id));
         delete sharedMockRepository.slots[id];
@@ -226,7 +230,7 @@ export const adminApi = {
     try {
       return await fetchSlotsForArea(parkingAreaId);
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
         return sharedMockRepository.slots[parkingAreaId] || [];
       }
@@ -247,7 +251,7 @@ export const adminApi = {
     try {
       return await fetchAllBookings();
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
         return sharedMockRepository.bookings;
       }
@@ -265,7 +269,7 @@ export const adminApi = {
         message: 'Check-in successful! Gate access granted.'
       };
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 500));
         const booking = sharedMockRepository.bookings.find(
           (b) => b.bookingCode === bookingCode || b.bookingCode.toLowerCase() === bookingCode.toLowerCase()
@@ -359,7 +363,7 @@ export const adminApi = {
       const response = await apiClient.put(`/api/bookings/${bookingId}/complete`);
       return mapBooking(response.data);
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 400));
         const booking = sharedMockRepository.bookings.find((b) => b.id === Number(bookingId));
         if (booking) {
@@ -386,7 +390,7 @@ export const adminApi = {
         source: 'AI-3'
       };
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         return INITIAL_AI3_PREDICTIONS;
       }
       throwApiError(error);

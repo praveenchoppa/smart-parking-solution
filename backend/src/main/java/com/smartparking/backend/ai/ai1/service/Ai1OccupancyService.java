@@ -14,6 +14,7 @@ import com.smartparking.backend.ai.ai1.dto.Ai1AreaInfoDto;
 import com.smartparking.backend.ai.ai1.dto.Ai1DetectedSlotDto;
 import com.smartparking.backend.ai.ai1.dto.Ai1OccupancyResponse;
 import com.smartparking.backend.ai.ai1.dto.Ai1SyncResultResponse;
+import com.smartparking.backend.common.exception.InvalidOperationException;
 import com.smartparking.backend.common.exception.ResourceNotFoundException;
 import com.smartparking.backend.parkingarea.repository.ParkingAreaRepository;
 import com.smartparking.backend.parkingslot.dto.ParkingSlotResponse;
@@ -102,7 +103,11 @@ public class Ai1OccupancyService {
     @org.springframework.transaction.annotation.Transactional
     public Ai1SyncResultResponse syncParkingAreaOccupancy(Long targetAreaId) {
         com.smartparking.backend.parkingarea.entity.ParkingArea area = resolveParkingArea(targetAreaId);
-        Long ai1AreaId = area.getAi1AreaId() != null ? area.getAi1AreaId() : targetAreaId;
+        if (area.getAi1AreaId() == null) {
+            throw new InvalidOperationException(
+                    "Parking area is not linked to AI-1. Set ai1AreaId before syncing occupancy.");
+        }
+        Long ai1AreaId = area.getAi1AreaId();
 
         Ai1OccupancyResponse ai1Response = ai1Client.fetchOccupancy(ai1AreaId);
         List<ParkingSlot> dbSlots = parkingSlotRepository.findByParkingAreaId(area.getId());

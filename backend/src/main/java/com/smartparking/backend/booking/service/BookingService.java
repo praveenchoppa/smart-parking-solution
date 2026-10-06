@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -44,6 +45,10 @@ public class BookingService {
     private static final EnumSet<BookingStatus> CANCELLABLE_STATUSES = EnumSet.of(
             BookingStatus.PENDING_PAYMENT,
             BookingStatus.PENDING_CHECK_IN);
+
+    private static final EnumSet<BookingStatus> ACTIVE_BOOKING_STATUSES = EnumSet.of(
+            BookingStatus.PENDING_CHECK_IN,
+            BookingStatus.CHECKED_IN);
 
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
@@ -88,7 +93,19 @@ public class BookingService {
 
     public BookingResponse getBookingById(Long id) {
         Booking booking = findBookingOrThrow(id);
-        return BookingResponse.fromEntity(booking);
+        Payment payment = paymentRepository.findByBookingId(id).orElse(null);
+        return BookingResponse.fromEntity(booking, payment);
+    }
+
+    public Optional<BookingResponse> getCurrentBookingForUser(Long userId) {
+        findUserOrThrow(userId);
+        return bookingRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .filter(booking -> ACTIVE_BOOKING_STATUSES.contains(booking.getStatus()))
+                .findFirst()
+                .map(booking -> {
+                    Payment payment = paymentRepository.findByBookingId(booking.getId()).orElse(null);
+                    return BookingResponse.fromEntity(booking, payment);
+                });
     }
 
     public BookingConfirmationResponse getBookingConfirmation(Long id) {

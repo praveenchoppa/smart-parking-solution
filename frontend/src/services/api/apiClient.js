@@ -87,6 +87,10 @@ export function throwApiError(error) {
   throw err;
 }
 
+export function shouldUseMock(error) {
+  return ENABLE_MOCK && !error.response;
+}
+
 export function getCurrentUserId() {
   const saved = localStorage.getItem('user');
   if (!saved) {

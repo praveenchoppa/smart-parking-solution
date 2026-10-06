@@ -223,8 +223,6 @@ export default function VehicleManagement() {
             options={[
               { value: 'CAR', label: 'Car / Sedan' },
               { value: 'SUV', label: 'SUV / Crossover' },
-              { value: 'HATCHBACK', label: 'Hatchback' },
-              { value: 'EV', label: 'Electric Vehicle (EV)' },
               { value: 'BIKE', label: 'Two-Wheeler / Motorbike' }
             ]}
           />

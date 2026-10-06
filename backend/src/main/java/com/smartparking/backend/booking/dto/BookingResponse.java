@@ -29,6 +29,7 @@ public class BookingResponse {
     private final BookingStatus status;
     private final PaymentStatus paymentStatus;
     private final LocalDateTime paidAt;
+    private final LocalDateTime checkedInAt;
     private final LocalDateTime completedAt;
     private final LocalDateTime createdAt;
 
@@ -52,6 +53,7 @@ public class BookingResponse {
                 .status(booking.getStatus())
                 .paymentStatus(payment != null ? payment.getStatus() : null)
                 .paidAt(payment != null ? payment.getPaidAt() : null)
+                .checkedInAt(booking.getCheckedInAt())
                 .completedAt(booking.getCompletedAt())
                 .createdAt(booking.getCreatedAt())
                 .build();

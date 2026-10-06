@@ -33,9 +33,9 @@ export default function BookingHistory() {
 
   const filteredBookings = bookings.filter((b) => {
     const matchesSearch =
-      b.parkingAreaName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.bookingCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase());
+      (b.parkingAreaName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.bookingCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.vehicleNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = filterStatus === 'ALL' || b.status === filterStatus;
 

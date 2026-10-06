@@ -53,6 +53,7 @@ public class CheckInService {
         LocalDateTime checkedInAt = LocalDateTime.now();
 
         booking.setStatus(BookingStatus.CHECKED_IN);
+        booking.setCheckedInAt(checkedInAt);
         bookingRepository.save(booking);
 
         parkingSlot.setStatus(SlotStatus.OCCUPIED);

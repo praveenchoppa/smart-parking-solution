@@ -78,6 +78,9 @@ public class Booking {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "checked_in_at")
+    private LocalDateTime checkedInAt;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

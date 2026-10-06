@@ -1,4 +1,4 @@
-import { apiClient, ENABLE_MOCK } from './apiClient';
+import { apiClient, shouldUseMock, throwApiError } from './apiClient';
 import { sharedMockRepository } from '../mock/mockData';
 
 // Haversine distance calculator in kilometers
@@ -56,15 +56,25 @@ export async function fetchSlotsForArea(parkingAreaId) {
   return list.map(mapSlot);
 }
 
+async function withOccupancy(area) {
+  try {
+    const slots = await fetchSlotsForArea(area.id);
+    return mapParkingArea(area, occupancyFromSlots(slots, area.totalSlots));
+  } catch {
+    return mapParkingArea(area);
+  }
+}
+
 export const parkingApi = {
   getNearbyParkingAreas: async ({ latitude, longitude, radius = 500 }) => {
     try {
       const response = await apiClient.get('/api/parking-areas/nearby', {
         params: { latitude, longitude, radius }
       });
-      return response.data;
+      const areas = response.data || [];
+      return Promise.all(areas.map((area) => withOccupancy(area)));
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
         
         // Return shared parking areas enriched with calculated distance
@@ -80,44 +90,48 @@ export const parkingApi = {
           };
         });
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   getAllParkingAreas: async () => {
     try {
       const response = await apiClient.get('/api/parking-areas');
-      return response.data || [];
+      const areas = response.data || [];
+      return Promise.all(areas.map((area) => withOccupancy(area)));
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 200));
         return sharedMockRepository.parkingAreas;
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   getParkingDetails: async (id) => {
     try {
       const response = await apiClient.get(`/api/parking-areas/${id}`);
-      return response.data;
+      return withOccupancy(response.data);
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
         const parking = sharedMockRepository.parkingAreas.find((p) => p.id === Number(id));
         if (!parking) throw new Error("Parking area not found");
         return parking;
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   getParkingSlots: async (parkingAreaId) => {
     try {
-      const response = await apiClient.get(`/api/parking-areas/${parkingAreaId}/slots`);
-      return response.data;
+      const slots = await fetchSlotsForArea(parkingAreaId);
+      return {
+        parkingAreaId: Number(parkingAreaId),
+        slots
+      };
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 300));
         const slots = sharedMockRepository.slots[parkingAreaId] || [
           { slotId: Number(parkingAreaId) * 100 + 1, slotNumber: "S-01", status: "AVAILABLE" },
@@ -129,7 +143,7 @@ export const parkingApi = {
           slots
         };
       }
-      throw error;
+      throwApiError(error);
     }
   }
 };

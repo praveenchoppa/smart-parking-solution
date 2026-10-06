@@ -40,7 +40,7 @@ export default function Register() {
       await register({
         name: formData.name,
         email: formData.email,
-        phone: formData.phone,
+        phone: formData.phone.replace(/[^\d+]/g, ''),
         password: formData.password
       });
       navigate('/home');

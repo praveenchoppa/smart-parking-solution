@@ -1,28 +1,33 @@
-import { apiClient, ENABLE_MOCK } from './apiClient';
+import { apiClient, shouldUseMock, getCurrentUserId, throwApiError } from './apiClient';
 import { INITIAL_MOCK_VEHICLES } from '../mock/mockData';
 
 let mockVehicles = [...INITIAL_MOCK_VEHICLES];
 
+function vehiclesPath(suffix = '') {
+  const userId = getCurrentUserId();
+  return `/api/users/${userId}/vehicles${suffix}`;
+}
+
 export const vehicleApi = {
   getVehicles: async () => {
     try {
-      const response = await apiClient.get('/api/vehicles');
+      const response = await apiClient.get(vehiclesPath());
       return response.data;
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 400));
         return mockVehicles;
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   addVehicle: async (vehicleData) => {
     try {
-      const response = await apiClient.post('/api/vehicles', vehicleData);
+      const response = await apiClient.post(vehiclesPath(), vehicleData);
       return response.data;
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 500));
         const newVehicle = {
           id: Date.now(),
@@ -32,39 +37,39 @@ export const vehicleApi = {
         mockVehicles.push(newVehicle);
         return newVehicle;
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   updateVehicle: async (id, vehicleData) => {
     try {
-      const response = await apiClient.put(`/api/vehicles/${id}`, vehicleData);
+      const response = await apiClient.put(vehiclesPath(`/${id}`), vehicleData);
       return response.data;
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 400));
         const idx = mockVehicles.findIndex((v) => v.id === Number(id));
         if (idx !== -1) {
           mockVehicles[idx] = { ...mockVehicles[idx], ...vehicleData };
           return mockVehicles[idx];
         }
-        throw new Error("Vehicle not found");
+        throw new Error('Vehicle not found');
       }
-      throw error;
+      throwApiError(error);
     }
   },
 
   deleteVehicle: async (id) => {
     try {
-      const response = await apiClient.delete(`/api/vehicles/${id}`);
+      const response = await apiClient.delete(vehiclesPath(`/${id}`));
       return response.data;
     } catch (error) {
-      if (ENABLE_MOCK) {
+      if (shouldUseMock(error)) {
         await new Promise((res) => setTimeout(res, 400));
         mockVehicles = mockVehicles.filter((v) => v.id !== Number(id));
-        return { success: true, message: "Vehicle deleted successfully." };
+        return { success: true, message: 'Vehicle deleted successfully.' };
       }
-      throw error;
+      throwApiError(error);
     }
   }
 };

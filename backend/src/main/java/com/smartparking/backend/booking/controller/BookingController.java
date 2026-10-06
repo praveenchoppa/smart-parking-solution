@@ -31,6 +31,9 @@ public class BookingController {
 
     @PostMapping("/api/bookings")
     public ResponseEntity<BookingResponse> createBooking(@Valid @RequestBody CreateBookingRequest request) {
+        if (request.getUserId() == null) {
+            request.setUserId(SecurityUtils.getCurrentUserId());
+        }
         SecurityUtils.requireSelfOrAdmin(request.getUserId());
         BookingResponse response = bookingService.createBooking(request);
 
@@ -60,6 +63,18 @@ public class BookingController {
     public ResponseEntity<List<BookingResponse>> getBookingsByUserId(@PathVariable Long userId) {
         SecurityUtils.requireSelfOrAdmin(userId);
         return ResponseEntity.ok(bookingService.getBookingsByUserId(userId));
+    }
+
+    @GetMapping("/api/bookings/current")
+    public ResponseEntity<BookingResponse> getCurrentBooking() {
+        return bookingService.getCurrentBookingForUser(SecurityUtils.getCurrentUserId())
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/api/bookings/history")
+    public ResponseEntity<List<BookingResponse>> getBookingHistory() {
+        return ResponseEntity.ok(bookingService.getBookingsByUserId(SecurityUtils.getCurrentUserId()));
     }
 
     @PutMapping("/api/bookings/{id}/cancel")

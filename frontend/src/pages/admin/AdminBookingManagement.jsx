@@ -47,9 +47,9 @@ export default function AdminBookingManagement() {
 
   const filteredBookings = bookings.filter((b) => {
     const matchesSearch =
-      b.bookingCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.parkingAreaName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase());
+      (b.bookingCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.parkingAreaName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.vehicleNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
 

@@ -28,7 +28,7 @@ export default function Payment() {
         method: "SIMULATED_CARD"
       });
 
-      if (response.success) {
+      if (response.success || response.status === 'SUCCESS') {
         setPaymentState('SUCCESS');
         setTimeout(() => {
           navigate('/booking/success', {

@@ -9,7 +9,7 @@ import lombok.Setter;
 @Setter
 public class CreateBookingRequest {
 
-    @NotNull(message = "User ID is required")
+    /** Set from JWT in BookingController when omitted by the client. */
     private Long userId;
 
     @NotNull(message = "Vehicle ID is required")
