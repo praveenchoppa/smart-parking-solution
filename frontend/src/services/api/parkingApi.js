@@ -66,12 +66,15 @@ async function withOccupancy(area) {
 }
 
 export const parkingApi = {
-  getNearbyParkingAreas: async ({ latitude, longitude, radius = 500 }) => {
+  getNearbyParkingAreas: async ({ latitude, longitude, radius = 50000 }) => {
     try {
       const response = await apiClient.get('/api/parking-areas/nearby', {
         params: { latitude, longitude, radius }
       });
-      const areas = response.data || [];
+      let areas = response.data || [];
+      if (areas.length === 0) {
+        return parkingApi.getAllParkingAreas();
+      }
       return Promise.all(areas.map((area) => withOccupancy(area)));
     } catch (error) {
       if (shouldUseMock(error)) {

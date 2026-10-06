@@ -61,9 +61,9 @@ public class ParkingAreaService {
             double longitude,
             Double radius) {
 
-        double searchRadius = radius != null ? radius : DEFAULT_RADIUS_METERS;
+        double searchRadius = (radius != null && radius >= 5000.0) ? radius : 50000.0;
 
-        return parkingAreaRepository.findAll().stream()
+        List<NearbyParkingAreaResponse> nearby = parkingAreaRepository.findAll().stream()
                 .map(parkingArea -> {
                     double distance = GeoUtils.calculateDistanceMeters(
                             latitude,
@@ -76,6 +76,23 @@ public class ParkingAreaService {
                 .sorted(Comparator.comparingDouble(ParkingAreaDistance::distance))
                 .map(entry -> NearbyParkingAreaResponse.fromEntity(entry.parkingArea(), entry.distance()))
                 .toList();
+
+        if (nearby.isEmpty()) {
+            return parkingAreaRepository.findAll().stream()
+                    .map(parkingArea -> {
+                        double distance = GeoUtils.calculateDistanceMeters(
+                                latitude,
+                                longitude,
+                                parkingArea.getLatitude(),
+                                parkingArea.getLongitude());
+                        return new ParkingAreaDistance(parkingArea, distance);
+                    })
+                    .sorted(Comparator.comparingDouble(ParkingAreaDistance::distance))
+                    .map(entry -> NearbyParkingAreaResponse.fromEntity(entry.parkingArea(), entry.distance()))
+                    .toList();
+        }
+
+        return nearby;
     }
 
     public ParkingAreaResponse updateParkingArea(Long id, UpdateParkingAreaRequest request) {

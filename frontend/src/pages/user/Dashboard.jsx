@@ -40,18 +40,22 @@ export default function Dashboard() {
       const lat = location?.latitude ?? DEMO_SEARCH_CENTER.latitude;
       const lng = location?.longitude ?? DEMO_SEARCH_CENTER.longitude;
 
-      const [areas, ai2Recommendation] = await Promise.all([
+      let [areas, ai2Recommendation] = await Promise.all([
         parkingApi.getNearbyParkingAreas({
           latitude: lat,
           longitude: lng,
-          radius: NEARBY_SEARCH_RADIUS_METERS
+          radius: NEARBY_SEARCH_RADIUS_METERS || 50000
         }),
         recommendApi.getRecommendation({
           latitude: lat,
           longitude: lng,
-          radius: NEARBY_SEARCH_RADIUS_METERS
+          radius: NEARBY_SEARCH_RADIUS_METERS || 50000
         }).catch(() => ({ recommendationAvailable: false }))
       ]);
+
+      if (!areas || areas.length === 0) {
+        areas = await parkingApi.getAllParkingAreas();
+      }
 
       setParkingAreas(areas || []);
       if (areas && areas.length > 0) {
