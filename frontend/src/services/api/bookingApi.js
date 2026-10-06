@@ -3,6 +3,32 @@ import { INITIAL_MOCK_BOOKINGS, INITIAL_MOCK_PARKING_AREAS, INITIAL_MOCK_SLOTS, 
 
 let mockBookings = [...INITIAL_MOCK_BOOKINGS];
 
+function mapPaymentStatus(paymentStatus) {
+  if (paymentStatus === 'SUCCESS') return 'PAID';
+  if (paymentStatus === 'PENDING') return 'UNPAID';
+  return paymentStatus;
+}
+
+export function mapBooking(booking) {
+  if (!booking) return booking;
+  const amount = booking.amount ?? booking.totalAmount;
+  const durationHours = booking.durationHours;
+  const hourlyRate =
+    booking.hourlyRate ??
+    (amount != null && durationHours ? Number(amount) / Number(durationHours) : undefined);
+
+  return {
+    ...booking,
+    id: booking.id ?? booking.bookingId,
+    totalAmount: amount,
+    hourlyRate,
+    completedTime: booking.completedAt ?? booking.completedTime,
+    paymentStatus: mapPaymentStatus(booking.paymentStatus),
+    qrData: booking.qrCodeValue || booking.qrData || booking.bookingCode,
+    status: booking.status || booking.bookingStatus
+  };
+}
+
 export const bookingApi = {
   createBooking: async (bookingData) => {
     // Body: { parkingAreaId, parkingSlotId, vehicleId, durationHours }

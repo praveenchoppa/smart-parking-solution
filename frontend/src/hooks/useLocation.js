@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { DEMO_SEARCH_CENTER } from '../constants/demoLocation';
 
 export function useLocation() {
-  const [location, setLocation] = useState({ latitude: 12.9716, longitude: 77.5946 }); // Default fallback
-  const [loading, setLoading] = useState(false);
+  const [location, setLocation] = useState(DEMO_SEARCH_CENTER);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [gpsResolved, setGpsResolved] = useState(false);
 
-  const requestLocation = () => {
+  const requestLocation = useCallback(() => {
     setLoading(true);
     setError(null);
 
     if (typeof window === 'undefined' || !navigator?.geolocation) {
-      setError("Geolocation is not supported by your browser. Using default city center coordinates.");
-      setLocation({ latitude: 12.9716, longitude: 77.5946 });
+      setError('Geolocation is not supported by your browser. Using demo search center.');
+      setLocation(DEMO_SEARCH_CENTER);
+      setGpsResolved(false);
       setLoading(false);
       return;
     }
@@ -25,44 +28,47 @@ export function useLocation() {
               longitude: position.coords.longitude,
               accuracy: position.coords.accuracy
             });
+            setGpsResolved(true);
           }
           setLoading(false);
         },
         (err) => {
-          let message = "Location permission blocked by browser. Using default city center coordinates.";
+          let message = 'Unable to retrieve your location. Using demo search center.';
           if (err) {
             switch (err.code) {
               case err.PERMISSION_DENIED:
-                message = "Location permission blocked. Using default city center coordinates.";
+                message = 'Location access denied. Using demo search center for nearby parking.';
                 break;
               case err.POSITION_UNAVAILABLE:
-                message = "Location unavailable. Using default city center coordinates.";
+                message = 'Location information unavailable. Using demo search center.';
                 break;
               case err.TIMEOUT:
-                message = "Location request timed out. Using default city center coordinates.";
+                message = 'Location request timed out. Using demo search center.';
                 break;
               default:
                 break;
             }
           }
           setError(message);
-          setLocation({ latitude: 12.9716, longitude: 77.5946 });
+          setLocation(DEMO_SEARCH_CENTER);
+          setGpsResolved(false);
           setLoading(false);
         },
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
       );
-    } catch (e) {
-      setError("Location request failed. Using default city center coordinates.");
-      setLocation({ latitude: 12.9716, longitude: 77.5946 });
+    } catch {
+      setError('Location request failed. Using demo search center.');
+      setLocation(DEMO_SEARCH_CENTER);
+      setGpsResolved(false);
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     requestLocation();
-  }, []);
+  }, [requestLocation]);
 
-  return { location, loading, error, requestLocation };
+  return { location, loading, error, gpsResolved, requestLocation };
 }
 
 export default useLocation;

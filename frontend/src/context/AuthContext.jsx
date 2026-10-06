@@ -1,59 +1,75 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../services/api/authApi';
+import { apiClient } from '../services/api/apiClient';
 
 const AuthContext = createContext(null);
 
+function readStoredUser() {
+  const savedUser = localStorage.getItem('user');
+  if (!savedUser) {
+    return null;
+  }
+  try {
+    return JSON.parse(savedUser);
+  } catch {
+    return null;
+  }
+}
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try { return JSON.parse(savedUser); } catch (e) {}
-    }
-    // Default demo session for immediate dashboard access
-    const defaultUser = { id: 1, name: "Driver User", email: "user@parking.com", role: "USER" };
-    localStorage.setItem('user', JSON.stringify(defaultUser));
-    return defaultUser;
-  });
-
-  const [token, setToken] = useState(() => {
-    const savedToken = localStorage.getItem('token');
-    if (savedToken) return savedToken;
-    const defaultToken = "mock-jwt-token-user-123";
-    localStorage.setItem('token', defaultToken);
-    return defaultToken;
-  });
-
+  const [user, setUser] = useState(readStoredUser);
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('token', token);
+  const persistSession = (nextToken, nextUser) => {
+    setToken(nextToken);
+    setUser(nextUser);
+    if (nextToken && nextUser) {
+      localStorage.setItem('token', nextToken);
+      localStorage.setItem('user', JSON.stringify(nextUser));
     } else {
       localStorage.removeItem('token');
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
       localStorage.removeItem('user');
     }
-  }, [user]);
+  };
+
+  useEffect(() => {
+    const validateStoredSession = async () => {
+      const storedUser = readStoredUser();
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken || !storedUser?.id) {
+        persistSession(null, null);
+        setInitializing(false);
+        return;
+      }
+
+      try {
+        const response = await apiClient.get(`/api/users/${storedUser.id}`);
+        persistSession(storedToken, response.data);
+      } catch {
+        persistSession(null, null);
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    validateStoredSession();
+  }, []);
 
   const login = async (credentials) => {
     setLoading(true);
     setError(null);
     try {
       const data = await authApi.login(credentials);
-      setToken(data.token);
-      setUser(data.user);
+      persistSession(data.token, data.user);
       setLoading(false);
       return data.user;
     } catch (err) {
       setLoading(false);
-      const errMsg = err.message || "Invalid email or password.";
+      persistSession(null, null);
+      const errMsg = err.message || 'Invalid email or password.';
       setError(errMsg);
       throw new Error(errMsg);
     }
@@ -64,27 +80,31 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const data = await authApi.register(userData);
-      setToken(data.token);
-      setUser(data.user);
+      persistSession(data.token, data.user);
       setLoading(false);
       return data.user;
     } catch (err) {
       setLoading(false);
-      const errMsg = err.message || "Registration failed. Please try again.";
+      const errMsg = err.message || 'Registration failed. Please try again.';
       setError(errMsg);
       throw new Error(errMsg);
     }
   };
 
   const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    persistSession(null, null);
   };
 
-  const isAuthenticated = Boolean(token && user);
+  const isAuthenticated = Boolean(token && user?.id);
   const isAdmin = Boolean(isAuthenticated && user?.role === 'ADMIN');
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-sm text-slate-500">
+        Restoring session...
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider
@@ -109,7 +129,7 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };

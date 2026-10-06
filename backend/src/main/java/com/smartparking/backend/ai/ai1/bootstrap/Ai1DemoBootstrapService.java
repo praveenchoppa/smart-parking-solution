@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.smartparking.backend.ai.ai1.client.Ai1Client;
+import com.smartparking.backend.common.util.GeoUtils;
 import com.smartparking.backend.parkingarea.entity.ParkingArea;
 import com.smartparking.backend.parkingarea.repository.ParkingAreaRepository;
 import com.smartparking.backend.parkingslot.entity.ParkingSlot;
@@ -52,6 +53,7 @@ public class Ai1DemoBootstrapService {
                     }
                 }
                 syncParkingAreaSequence();
+                alignDemoCoordinates();
                 log.info("AI-1 demo bootstrap completed dynamically for {} AI-1 areas.", ai1Areas.size());
                 return BootstrapResult.created(DEMO_PARKING_AREA_ID, ai1Areas.size());
             }
@@ -60,6 +62,7 @@ public class Ai1DemoBootstrapService {
         }
 
         if (parkingAreaRepository.existsByAi1AreaId(DEMO_PARKING_AREA_ID) || parkingAreaRepository.existsById(DEMO_PARKING_AREA_ID)) {
+            alignDemoCoordinates();
             return validateExistingDemoArea();
         }
 
@@ -82,8 +85,8 @@ public class Ai1DemoBootstrapService {
                 .setParameter("id", id)
                 .setParameter("name", name)
                 .setParameter("address", "AI-1 Configured Area " + id)
-                .setParameter("latitude", 12.9716 + (id * 0.005))
-                .setParameter("longitude", 77.5946 + (id * 0.005))
+                .setParameter("latitude", DemoLocationConstants.latitudeForAi1Area(id))
+                .setParameter("longitude", DemoLocationConstants.longitudeForAi1Area(id))
                 .setParameter("hourlyRate", 40.0)
                 .setParameter("totalSlots", totalSlots)
                 .setParameter("ai1AreaId", id)
@@ -131,8 +134,8 @@ public class Ai1DemoBootstrapService {
                 .setParameter("id", DEMO_PARKING_AREA_ID)
                 .setParameter("name", DEMO_AREA_NAME)
                 .setParameter("address", DEMO_AREA_ADDRESS)
-                .setParameter("latitude", 12.9716)
-                .setParameter("longitude", 77.5946)
+                .setParameter("latitude", DemoLocationConstants.latitudeForAi1Area(DEMO_PARKING_AREA_ID))
+                .setParameter("longitude", DemoLocationConstants.longitudeForAi1Area(DEMO_PARKING_AREA_ID))
                 .setParameter("hourlyRate", 40.0)
                 .setParameter("totalSlots", DEMO_SLOT_COUNT)
                 .setParameter("ai1AreaId", DEMO_PARKING_AREA_ID)
@@ -150,6 +153,52 @@ public class Ai1DemoBootstrapService {
                         .status(SlotStatus.AVAILABLE)
                         .build())
                 .forEach(parkingSlotRepository::save);
+    }
+
+    private void alignDemoCoordinates() {
+        List<ParkingArea> areas = parkingAreaRepository.findAll();
+        int updated = 0;
+        for (ParkingArea area : areas) {
+            Long ai1AreaId = resolveAi1AreaIdForAlignment(area);
+            if (ai1AreaId == null) {
+                continue;
+            }
+            double targetLat = DemoLocationConstants.latitudeForAi1Area(ai1AreaId);
+            double targetLng = DemoLocationConstants.longitudeForAi1Area(ai1AreaId);
+            double distanceMeters = GeoUtils.calculateDistanceMeters(
+                    area.getLatitude(),
+                    area.getLongitude(),
+                    targetLat,
+                    targetLng);
+            if (distanceMeters <= 50.0 && area.getAi1AreaId() != null) {
+                continue;
+            }
+            if (area.getAi1AreaId() == null) {
+                area.setAi1AreaId(ai1AreaId);
+            }
+            area.setLatitude(targetLat);
+            area.setLongitude(targetLng);
+            parkingAreaRepository.save(area);
+            updated++;
+        }
+        if (updated > 0) {
+            log.info("Aligned {} AI-1 linked parking area(s) to demo coordinates ({}, {}).",
+                    updated,
+                    DemoLocationConstants.DEMO_LATITUDE,
+                    DemoLocationConstants.DEMO_LONGITUDE);
+        }
+    }
+
+    private Long resolveAi1AreaIdForAlignment(ParkingArea area) {
+        if (area.getAi1AreaId() != null) {
+            return area.getAi1AreaId();
+        }
+        if (DEMO_PARKING_AREA_ID == area.getId()
+                && DEMO_AREA_ADDRESS.equals(area.getAddress())
+                && area.getTotalSlots() == DEMO_SLOT_COUNT) {
+            return DEMO_PARKING_AREA_ID;
+        }
+        return null;
     }
 
     private void syncParkingAreaSequence() {

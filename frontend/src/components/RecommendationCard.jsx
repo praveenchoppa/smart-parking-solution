@@ -24,7 +24,7 @@ export default function RecommendationCard({ recommendationData, onSelect }) {
           <div>
             <div className="flex items-center gap-2">
               <span className="bg-brand-400/20 text-brand-200 text-xs font-bold px-2.5 py-0.5 rounded-full border border-brand-400/30 uppercase tracking-wider">
-                AI-2 Recommendation (Future API Ready)
+                AI-2 Recommendation
               </span>
               {score && (
                 <span className="text-xs text-brand-300 font-mono font-medium">

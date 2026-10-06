@@ -26,6 +26,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'Dashboard', path: '/dashboard', icon: MapPin },
+    { name: 'Current Pass', path: '/current-booking', icon: ParkingSquare },
     { name: 'My Bookings', path: '/bookings', icon: Clock },
     { name: 'My Vehicles', path: '/vehicles', icon: Car },
     { name: 'Profile', path: '/profile', icon: User },

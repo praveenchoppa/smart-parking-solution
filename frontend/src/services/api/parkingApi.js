@@ -18,6 +18,44 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return parseFloat(d.toFixed(1));
 }
 
+export function mapSlot(slot) {
+  if (!slot) return slot;
+  return {
+    ...slot,
+    slotId: slot.id,
+    slotNumber: slot.slotNumber,
+    status: slot.status
+  };
+}
+
+export function occupancyFromSlots(slots, totalSlotsFromArea) {
+  const list = slots || [];
+  const availableSlots = list.filter((s) => s.status === 'AVAILABLE').length;
+  const occupiedSlots = list.filter((s) => s.status === 'OCCUPIED').length;
+  const reservedSlots = list.filter((s) => s.status === 'RESERVED').length;
+  const totalSlots = totalSlotsFromArea ?? list.length;
+  const occupancyPercentage = totalSlots > 0 ? Math.round((occupiedSlots / totalSlots) * 100) : 0;
+  return { availableSlots, occupiedSlots, reservedSlots, occupancyPercentage };
+}
+
+export function mapParkingArea(area, occupancy = {}) {
+  if (!area) return area;
+  const distanceMeters = area.distanceMeters;
+  return {
+    ...area,
+    distance: distanceMeters != null ? distanceMeters / 1000 : area.distance,
+    availableSlots: occupancy.availableSlots,
+    occupiedSlots: occupancy.occupiedSlots,
+    occupancyPercentage: occupancy.occupancyPercentage
+  };
+}
+
+export async function fetchSlotsForArea(parkingAreaId) {
+  const response = await apiClient.get(`/api/parking-areas/${parkingAreaId}/slots`);
+  const list = Array.isArray(response.data) ? response.data : [];
+  return list.map(mapSlot);
+}
+
 export const parkingApi = {
   getNearbyParkingAreas: async ({ latitude, longitude, radius = 500 }) => {
     try {
@@ -41,6 +79,19 @@ export const parkingApi = {
             distance: dist || 0.5
           };
         });
+      }
+      throw error;
+    }
+  },
+
+  getAllParkingAreas: async () => {
+    try {
+      const response = await apiClient.get('/api/parking-areas');
+      return response.data || [];
+    } catch (error) {
+      if (ENABLE_MOCK) {
+        await new Promise((res) => setTimeout(res, 200));
+        return sharedMockRepository.parkingAreas;
       }
       throw error;
     }

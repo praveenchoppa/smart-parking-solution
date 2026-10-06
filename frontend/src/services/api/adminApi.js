@@ -57,6 +57,15 @@ export const adminApi = {
         );
       });
 
+      let ai3Predictions = null;
+      if (areas.length > 0) {
+        try {
+          ai3Predictions = await adminApi.getPredictionReports(areas[0].id);
+        } catch {
+          ai3Predictions = null;
+        }
+      }
+
       return {
         totalParkingAreas: areas.length,
         totalSlots,
@@ -70,7 +79,8 @@ export const adminApi = {
         totalRevenue: bookings
           .filter((b) => b.status !== 'PENDING_PAYMENT' && b.status !== 'CANCELLED')
           .reduce((sum, b) => sum + Number(b.totalAmount || b.amount || 0), 0),
-        overallOccupancyPercentage: Math.round((occupiedSlots / (totalSlots || 1)) * 100)
+        overallOccupancyPercentage: Math.round((occupiedSlots / (totalSlots || 1)) * 100),
+        ai3Predictions
       };
     } catch (error) {
       if (ENABLE_MOCK) {
@@ -366,23 +376,14 @@ export const adminApi = {
     try {
       const response = await apiClient.get(`/api/ai/ai3/parking-areas/${parkingAreaId}/predict`);
       const data = response.data;
-      const predictedOccupancy = Math.round(data.predicted_occupancy || 50);
-      const predictedOccupied = data.predicted_occupied_slots || 34;
-      const availableSlots = data.available_slots || 35;
+      const predictedOccupancy = Math.round(data.predicted_occupancy ?? 0);
 
       return {
-        currentOccupancyRate: predictedOccupancy,
-        peakExpectedTime: "05:00 PM - 07:00 PM",
-        peakExpectedOccupancy: Math.min(100, predictedOccupancy + 15),
-        predictedOccupiedSlots: predictedOccupied,
-        availableSlots: availableSlots,
-        hourlyPredictions: [
-          { time: "09:00 AM", occupancy: Math.max(10, predictedOccupancy - 20), occupancyPercentage: Math.max(10, predictedOccupancy - 20) },
-          { time: "12:00 PM", occupancy: Math.max(20, predictedOccupancy - 10), occupancyPercentage: Math.max(20, predictedOccupancy - 10) },
-          { time: "03:00 PM", occupancy: predictedOccupancy, occupancyPercentage: predictedOccupancy },
-          { time: "06:00 PM", occupancy: Math.min(100, predictedOccupancy + 15), occupancyPercentage: Math.min(100, predictedOccupancy + 15) },
-          { time: "09:00 PM", occupancy: Math.max(15, predictedOccupancy - 25), occupancyPercentage: Math.max(15, predictedOccupancy - 25) }
-        ]
+        parkingAreaId: Number(parkingAreaId),
+        predictedOccupancyRate: predictedOccupancy,
+        predictedOccupiedSlots: data.predicted_occupied_slots ?? 0,
+        availableSlots: data.available_slots ?? 0,
+        source: 'AI-3'
       };
     } catch (error) {
       if (ENABLE_MOCK) {

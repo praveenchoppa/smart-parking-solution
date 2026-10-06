@@ -16,6 +16,7 @@ public class ParkingAreaResponse {
     private final Double longitude;
     private final Double hourlyRate;
     private final Integer totalSlots;
+    private final Long ai1AreaId;
 
     public static ParkingAreaResponse fromEntity(ParkingArea parkingArea) {
         return ParkingAreaResponse.builder()
@@ -26,6 +27,7 @@ public class ParkingAreaResponse {
                 .longitude(parkingArea.getLongitude())
                 .hourlyRate(parkingArea.getHourlyRate())
                 .totalSlots(parkingArea.getTotalSlots())
+                .ai1AreaId(parkingArea.getAi1AreaId())
                 .build();
     }
 }

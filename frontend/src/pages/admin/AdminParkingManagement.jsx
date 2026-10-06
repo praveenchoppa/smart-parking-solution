@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Edit2, Trash2, MapPin, Grid } from 'lucide-react';
 import { adminApi } from '../../services/api/adminApi';
 import Modal from '../../components/common/Modal';
 import Input from '../../components/common/Input';
@@ -9,6 +10,7 @@ import ErrorState from '../../components/common/ErrorState';
 import { formatCurrency } from '../../utils/formatters';
 
 export default function AdminParkingManagement() {
+  const navigate = useNavigate();
   const [parkingAreas, setParkingAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,8 +21,8 @@ export default function AdminParkingManagement() {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
-    latitude: '12.9716',
-    longitude: '77.5946',
+    latitude: '9.7553',
+    longitude: '76.6499',
     hourlyRate: '40',
     totalSlots: '20'
   });
@@ -48,8 +50,8 @@ export default function AdminParkingManagement() {
     setFormData({
       name: '',
       address: '',
-      latitude: '12.9716',
-      longitude: '77.5946',
+      latitude: '9.7553',
+      longitude: '76.6499',
       hourlyRate: '40',
       totalSlots: '20'
     });
@@ -154,6 +156,9 @@ export default function AdminParkingManagement() {
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <Button onClick={() => navigate(`/admin/parking/${p.id}/slots`)} variant="outline" size="sm" icon={Grid}>
+                Slots
+              </Button>
               <Button onClick={() => handleOpenEdit(p)} variant="outline" size="sm" icon={Edit2}>
                 Edit
               </Button>

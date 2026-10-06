@@ -91,6 +91,7 @@ export default function App() {
           >
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/parking" element={<AdminParkingManagement />} />
+            <Route path="/admin/slots" element={<AdminSlotManagement />} />
             <Route path="/admin/parking/:id/slots" element={<AdminSlotManagement />} />
             <Route path="/admin/bookings" element={<AdminBookingManagement />} />
             <Route path="/admin/scanner" element={<AdminQRScanner />} />

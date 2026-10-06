@@ -134,8 +134,10 @@ export default function AdminDashboard() {
                 </span>
                 <h3 className="text-lg font-bold text-white">Peak Occupancy Forecast</h3>
                 <p className="text-xs text-slate-300">
-                  Predicted Peak Time: <strong>{predictions.peakExpectedTime}</strong> • Expected Peak Occupancy:{' '}
-                  <strong className="text-amber-400">{predictions.peakExpectedOccupancy}%</strong>
+                  Next-hour predicted occupancy:{' '}
+                  <strong className="text-amber-400">{predictions.predictedOccupancyRate ?? predictions.currentOccupancyRate}%</strong>
+                  {' '}• Predicted available slots:{' '}
+                  <strong>{predictions.availableSlots ?? '—'}</strong>
                 </p>
               </div>
             </div>

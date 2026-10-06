@@ -16,6 +16,7 @@ export default function Sidebar() {
   const menuItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'Parking Areas', path: '/admin/parking', icon: ParkingSquare },
+    { name: 'Slot Management', path: '/admin/slots', icon: Grid },
     { name: 'Bookings', path: '/admin/bookings', icon: BookOpen },
     { name: 'QR Scanner', path: '/admin/scanner', icon: QrCode },
     { name: 'Reports & AI-3', path: '/admin/reports', icon: BarChart3 },
@@ -33,7 +34,8 @@ export default function Sidebar() {
       <nav className="space-y-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.path;
+          const isActive = location.pathname === item.path
+            || (item.path === '/admin/slots' && location.pathname.includes('/slots'));
           return (
             <Link
               key={item.path}
