@@ -1,64 +1,74 @@
 import React from 'react';
-import { Car, Lock, CheckCircle2 } from 'lucide-react';
+import { clsx } from 'clsx';
+import { Check, Lock, Car } from 'lucide-react';
 
 export default function SlotCard({ slot, isSelected, onSelect }) {
+  if (!slot) return null;
+
   const { slotId, slotNumber, status } = slot;
 
   const isAvailable = status === 'AVAILABLE';
-  const isOccupied = status === 'OCCUPIED';
   const isReserved = status === 'RESERVED';
-
-  const handleClick = () => {
-    if (isAvailable && onSelect) {
-      onSelect(slot);
-    }
-  };
-
-  let containerStyles = "cursor-pointer border bg-white dark:bg-slate-900 hover:border-brand-500 hover:shadow-md";
-  let badgeStyles = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
-  let statusText = "Available";
-
-  if (isSelected) {
-    containerStyles = "border-brand-600 bg-brand-50/80 dark:bg-brand-950/60 ring-2 ring-brand-500 shadow-lg scale-[1.02]";
-  } else if (isOccupied) {
-    containerStyles = "cursor-not-allowed opacity-65 bg-slate-100 dark:bg-slate-850 border-slate-200 dark:border-slate-800";
-    badgeStyles = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
-    statusText = "Occupied";
-  } else if (isReserved) {
-    containerStyles = "cursor-not-allowed opacity-65 bg-amber-500/5 border-amber-200 dark:border-amber-900/40";
-    badgeStyles = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
-    statusText = "Reserved";
-  }
+  const isOccupied = status === 'OCCUPIED';
 
   return (
-    <div
-      onClick={handleClick}
-      className={`relative rounded-2xl p-4 transition-all duration-200 flex flex-col items-center justify-between text-center min-h-[110px] ${containerStyles}`}
-    >
-      {isSelected && (
-        <div className="absolute top-2 right-2 text-brand-600 dark:text-brand-400">
-          <CheckCircle2 className="w-5 h-5 fill-brand-600 text-white" />
-        </div>
+    <button
+      type="button"
+      disabled={!isAvailable}
+      onClick={() => isAvailable && onSelect && onSelect(slot)}
+      aria-label={`Slot ${slotNumber}, status ${status}`}
+      className={clsx(
+        'relative group flex flex-col justify-between p-3 rounded-xl border transition-all duration-150 text-left min-h-[88px] select-none',
+        // Available & Selected
+        isSelected && isAvailable && 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-500 ring-offset-2 shadow-md scale-[1.02]',
+        // Available & Unselected
+        !isSelected && isAvailable && 'bg-white hover:bg-emerald-50/50 border-slate-200 hover:border-emerald-500 text-slate-900 shadow-sm cursor-pointer',
+        // Reserved
+        isReserved && 'bg-amber-50/80 border-amber-200 text-amber-800 cursor-not-allowed opacity-80',
+        // Occupied
+        isOccupied && 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-75'
       )}
+    >
+      {/* Top Bar: Slot Number & Status Indicator */}
+      <div className="flex items-center justify-between w-full">
+        <span className={clsx(
+          'font-mono font-bold text-sm tracking-tight',
+          isSelected && isAvailable ? 'text-white' : 'text-slate-900 dark:text-slate-100'
+        )}>
+          {slotNumber}
+        </span>
 
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-1 transition-colors bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-        {isOccupied ? (
-          <Car className="w-5 h-5 text-rose-500" />
-        ) : isReserved ? (
-          <Lock className="w-4 h-4 text-amber-500" />
-        ) : (
-          <span className="font-extrabold text-sm text-brand-600 dark:text-brand-400">P</span>
+        {isSelected && (
+          <span className="w-5 h-5 rounded-full bg-white text-emerald-700 flex items-center justify-center shrink-0">
+            <Check className="w-3.5 h-3.5 stroke-[3]" />
+          </span>
+        )}
+
+        {!isSelected && isAvailable && (
+          <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+            BAY
+          </span>
+        )}
+
+        {isReserved && (
+          <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 flex items-center gap-0.5">
+            <Lock className="w-2.5 h-2.5" />
+            HELD
+          </span>
+        )}
+
+        {isOccupied && (
+          <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 flex items-center gap-0.5">
+            <Car className="w-3 h-3" />
+            PARKED
+          </span>
         )}
       </div>
 
-      <div>
-        <h4 className="text-base font-extrabold text-slate-900 dark:text-white tracking-wide">
-          {slotNumber}
-        </h4>
-        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1 ${badgeStyles}`}>
-          {statusText}
-        </span>
+      {/* Visual Parking Bay Marking Line */}
+      <div className="w-full mt-2 pt-2 border-t border-dashed border-current/20 flex items-center justify-between text-[10px] font-mono opacity-80">
+        <span>{isAvailable ? 'TAP TO PICK' : status}</span>
       </div>
-    </div>
+    </button>
   );
 }

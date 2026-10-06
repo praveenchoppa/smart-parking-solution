@@ -35,7 +35,7 @@ export default function AdminParkingManagement() {
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError(err.message || "Unable to load parking area administration data.");
+      setError("Unable to load parking area administration data.");
     }
   };
 
@@ -97,7 +97,7 @@ export default function AdminParkingManagement() {
       const fresh = await adminApi.getParkingAreas();
       setParkingAreas([...fresh]);
     } catch (err) {
-      alert(err.message || "Failed to delete parking area.");
+      alert("Failed to delete parking area.");
     }
   };
 

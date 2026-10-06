@@ -1,9 +1,10 @@
-import { apiClient, ENABLE_MOCK, throwApiError } from './apiClient';
+import { apiClient, ENABLE_MOCK } from './apiClient';
 import { sharedMockRepository } from '../mock/mockData';
 
+// Haversine distance calculator in kilometers
 function calculateDistance(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0.5;
-  const R = 6371;
+  const R = 6371; // Earth radius in km
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -13,54 +14,8 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return parseFloat((R * c).toFixed(1));
-}
-
-export function mapSlot(slot) {
-  if (!slot) return slot;
-  return {
-    ...slot,
-    slotId: slot.id,
-    slotNumber: slot.slotNumber,
-    status: slot.status
-  };
-}
-
-export function occupancyFromSlots(slots, totalSlotsFromArea) {
-  const list = slots || [];
-  const availableSlots = list.filter((s) => s.status === 'AVAILABLE').length;
-  const occupiedSlots = list.filter((s) => s.status === 'OCCUPIED').length;
-  const reservedSlots = list.filter((s) => s.status === 'RESERVED').length;
-  const totalSlots = totalSlotsFromArea ?? list.length;
-  const occupancyPercentage = totalSlots > 0 ? Math.round((occupiedSlots / totalSlots) * 100) : 0;
-  return { availableSlots, occupiedSlots, reservedSlots, occupancyPercentage };
-}
-
-export function mapParkingArea(area, occupancy = {}) {
-  if (!area) return area;
-  const distanceMeters = area.distanceMeters;
-  return {
-    ...area,
-    distance: distanceMeters != null ? distanceMeters / 1000 : area.distance,
-    availableSlots: occupancy.availableSlots,
-    occupiedSlots: occupancy.occupiedSlots,
-    occupancyPercentage: occupancy.occupancyPercentage
-  };
-}
-
-export async function fetchSlotsForArea(parkingAreaId) {
-  const response = await apiClient.get(`/api/parking-areas/${parkingAreaId}/slots`);
-  const list = Array.isArray(response.data) ? response.data : [];
-  return list.map(mapSlot);
-}
-
-async function withOccupancy(area) {
-  try {
-    const slots = await fetchSlotsForArea(area.id);
-    return mapParkingArea(area, occupancyFromSlots(slots, area.totalSlots));
-  } catch {
-    return mapParkingArea(area);
-  }
+  const d = R * c;
+  return parseFloat(d.toFixed(1));
 }
 
 export const parkingApi = {
@@ -69,11 +24,12 @@ export const parkingApi = {
       const response = await apiClient.get('/api/parking-areas/nearby', {
         params: { latitude, longitude, radius }
       });
-      const areas = response.data || [];
-      return Promise.all(areas.map((area) => withOccupancy(area)));
+      return response.data;
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
+        
+        // Return shared parking areas enriched with calculated distance
         return sharedMockRepository.parkingAreas.map((p) => {
           let dist = p.distance;
           if (latitude && longitude && p.latitude && p.longitude) {
@@ -86,14 +42,14 @@ export const parkingApi = {
           };
         });
       }
-      throwApiError(error);
+      throw error;
     }
   },
 
   getParkingDetails: async (id) => {
     try {
       const response = await apiClient.get(`/api/parking-areas/${id}`);
-      return withOccupancy(response.data);
+      return response.data;
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
@@ -101,31 +57,14 @@ export const parkingApi = {
         if (!parking) throw new Error("Parking area not found");
         return parking;
       }
-      throwApiError(error);
-    }
-  },
-
-  getAllParkingAreas: async () => {
-    try {
-      const response = await apiClient.get('/api/parking-areas');
-      const areas = response.data || [];
-      return Promise.all(areas.map((area) => withOccupancy(area)));
-    } catch (error) {
-      if (ENABLE_MOCK) {
-        await new Promise((res) => setTimeout(res, 200));
-        return sharedMockRepository.parkingAreas;
-      }
-      throwApiError(error);
+      throw error;
     }
   },
 
   getParkingSlots: async (parkingAreaId) => {
     try {
-      const slots = await fetchSlotsForArea(parkingAreaId);
-      return {
-        parkingAreaId: Number(parkingAreaId),
-        slots
-      };
+      const response = await apiClient.get(`/api/parking-areas/${parkingAreaId}/slots`);
+      return response.data;
     } catch (error) {
       if (ENABLE_MOCK) {
         await new Promise((res) => setTimeout(res, 300));
@@ -139,7 +78,7 @@ export const parkingApi = {
           slots
         };
       }
-      throwApiError(error);
+      throw error;
     }
   }
 };

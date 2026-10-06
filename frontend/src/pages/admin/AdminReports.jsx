@@ -1,122 +1,130 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, TrendingUp, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { TrendingUp, Clock, AlertTriangle, Sparkles } from 'lucide-react';
 import { adminApi } from '../../services/api/adminApi';
 import StatCard from '../../components/common/StatCard';
-import ChartCard from '../../components/common/ChartCard';
-import Button from '../../components/common/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import ErrorState from '../../components/common/ErrorState';
 
 export default function AdminReports() {
-  const [predictions, setPredictions] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchPredictions = async () => {
+  const fetchReports = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await adminApi.getPredictionReports();
-      setPredictions(data);
+      const result = await adminApi.getPredictionReports();
+      setData(result);
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError("Prediction currently unavailable.");
+      setError("Unable to load AI-3 Occupancy Prediction Analytics.");
     }
   };
 
   useEffect(() => {
-    fetchPredictions();
+    fetchReports();
   }, []);
 
-  if (loading) return <LoadingSpinner message="Querying AI-3 occupancy predictive models..." fullScreen />;
+  if (loading) return <LoadingSpinner message="Loading AI-3 Occupancy Prediction models..." fullScreen />;
+  if (error || !data) return <ErrorState message={error || "Failed to load reports."} onRetry={fetchReports} />;
+
+  const chartData = data.hourlyPredictions || [];
 
   return (
     <div className="space-y-6">
       
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="w-4 h-4 text-brand-500 animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
-              AI-3 Intelligence Analytics
-            </span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white">Occupancy & AI-3 Predictions</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Predictive machine learning forecast generated via Spring Boot
-          </p>
+      {/* Header */}
+      <div>
+        <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 rounded-lg mb-1 border border-emerald-200">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+          <span>AI-3 Occupancy Forecast Engine Active</span>
         </div>
-
-        <Button onClick={fetchPredictions} variant="outline" size="sm" icon={RefreshCw}>
-          Recalculate AI Forecast
-        </Button>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white">Occupancy & Predictive Analytics</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          Machine learning time-series forecasts for peak parking congestion and capacity planning
+        </p>
       </div>
 
-      {error || !predictions ? (
-        /* Safe Failure Banner (Prompt Rule 24) */
-        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs p-6 rounded-3xl flex items-start gap-4">
-          <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
-          <div>
-            <h4 className="text-sm font-bold">Prediction currently unavailable.</h4>
-            <p className="mt-1 opacity-90">
-              The AI-3 analytics engine is temporarily unready or returning empty forecasts. All other admin dashboard functions remain active.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Key Forecast Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard
-              title="Current Overall Occupancy"
-              value={`${predictions.currentOccupancyRate}%`}
-              icon={TrendingUp}
-              color="brand"
-            />
-            <StatCard
-              title="Peak Expected Time"
-              value={predictions.peakExpectedTime}
-              icon={Clock}
-              color="amber"
-            />
-            <StatCard
-              title="Peak Expected Occupancy"
-              value={`${predictions.peakExpectedOccupancy}%`}
-              icon={Sparkles}
-              color="rose"
-            />
-          </div>
+      {/* Overview Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          title="Current System Occupancy"
+          value={`${data.currentOccupancyRate}%`}
+          color="emerald"
+        />
 
-          {/* Forecast Chart */}
-          <ChartCard
-            title="Hourly Occupancy Prediction Chart"
-            subtitle="Calculated probability curve for incoming rush hours"
-          >
-            <div className="space-y-4 pt-2">
-              {predictions.hourlyPredictions?.map((item) => (
-                <div key={item.time} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-slate-700 dark:text-slate-300 font-mono">{item.time}</span>
-                    <span className={`font-bold ${
-                      item.occupancyPercentage >= 85 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'
-                    }`}>
-                      {item.occupancyPercentage}% Occupied
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        item.occupancyPercentage >= 85 ? 'bg-rose-500' : item.occupancyPercentage >= 75 ? 'bg-amber-500' : 'bg-brand-500'
-                      }`}
-                      style={{ width: `${item.occupancyPercentage}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ChartCard>
-        </>
-      )}
+        <StatCard
+          title="Peak Expected Time"
+          value={data.peakExpectedTime}
+          color="amber"
+        />
+
+        <StatCard
+          title="Peak Forecast Occupancy"
+          value={`${data.peakExpectedOccupancy}%`}
+          color="rose"
+        />
+      </div>
+
+      {/* Peak Warning Callout */}
+      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-2xl p-4 flex items-start gap-3 text-amber-900 dark:text-amber-200">
+        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div>
+          <h4 className="text-xs font-mono font-bold uppercase tracking-wider">AI-3 Congestion Advisory</h4>
+          <p className="text-xs mt-0.5 text-amber-800 dark:text-amber-300">
+            System predicts peak congestion at <strong>{data.peakExpectedTime}</strong> reaching <strong>{data.peakExpectedOccupancy}% capacity</strong>. Ensure entry security scanners are pre-staffed.
+          </p>
+        </div>
+      </div>
+
+      {/* AI-3 Recharts Occupancy Curve */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Hourly Occupancy Prediction Curve</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Forecasted occupancy percentage over the next 7 hours</p>
+          </div>
+          <span className="text-xs font-mono text-slate-400">Time-Series Regression Model</span>
+        </div>
+
+        <div className="h-72 w-full pt-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="occupancyGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#059669" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#059669" stopOpacity={0.0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="time" stroke="#64748b" fontSize={11} tickLine={false} />
+              <YAxis stroke="#64748b" fontSize={11} domain={[0, 100]} unit="%" tickLine={false} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#0f172a',
+                  borderColor: '#334155',
+                  borderRadius: '12px',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontFamily: 'monospace'
+                }}
+                formatter={(value) => [`${value}% Occupancy`, 'Predicted']}
+              />
+              <Area
+                type="monotone"
+                dataKey="occupancyPercentage"
+                stroke="#059669"
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#occupancyGradient)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,30 +1,52 @@
 import React from 'react';
+import { clsx } from 'clsx';
 
-export default function StatusBadge({ status }) {
-  const normalized = (status || '').toUpperCase();
+const STATUS_CONFIGS = {
+  // SlotStatus
+  AVAILABLE: { label: 'Available', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40' },
+  RESERVED: { label: 'Reserved', className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40' },
+  OCCUPIED: { label: 'Occupied', className: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/40' },
 
-  const badgeConfig = {
-    AVAILABLE: { label: 'AVAILABLE', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-    RESERVED: { label: 'RESERVED', bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-    OCCUPIED: { label: 'OCCUPIED', bg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
-    PENDING_PAYMENT: { label: 'PENDING PAYMENT', bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-    PENDING_CHECK_IN: { label: 'PENDING CHECK-IN', bg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
-    CHECKED_IN: { label: 'CHECKED IN', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-    COMPLETED: { label: 'COMPLETED', bg: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
-    CANCELLED: { label: 'CANCELLED', bg: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-    PAID: { label: 'PAID', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-    UNPAID: { label: 'UNPAID', bg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
+  // BookingStatus
+  PENDING_PAYMENT: { label: 'Pending Payment', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  PENDING_CHECK_IN: { label: 'Pending Check-In', className: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300' },
+  CHECKED_IN: { label: 'Checked In', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  COMPLETED: { label: 'Completed', className: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300' },
+  CANCELLED: { label: 'Cancelled', className: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400' },
+
+  // PaymentStatus
+  PENDING: { label: 'Payment Pending', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  SUCCESS: { label: 'Paid', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  FAILED: { label: 'Payment Failed', className: 'bg-rose-50 text-rose-700 border-rose-200' },
+
+  // Roles
+  ADMIN: { label: 'System Admin', className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300' },
+  USER: { label: 'Registered Driver', className: 'bg-slate-100 text-slate-700 border-slate-200' }
+};
+
+export default function StatusBadge({ status, customLabel, size = 'sm', className = '' }) {
+  const config = STATUS_CONFIGS[status] || {
+    label: status || 'Unknown',
+    className: 'bg-slate-100 text-slate-600 border-slate-200'
   };
 
-  const config = badgeConfig[normalized] || {
-    label: normalized || 'UNKNOWN',
-    bg: 'bg-slate-100 text-slate-700 border-slate-200'
+  const sizeClasses = {
+    xs: 'text-[10px] px-1.5 py-0.5 rounded-md font-mono font-medium',
+    sm: 'text-xs px-2.5 py-0.5 rounded-md font-mono font-medium',
+    md: 'text-xs px-3 py-1 rounded-lg font-mono font-semibold'
   };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border tracking-wider ${config.bg}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 animate-pulse" />
-      {config.label}
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1 border',
+        sizeClasses[size],
+        config.className,
+        className
+      )}
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
+      <span>{customLabel || config.label}</span>
     </span>
   );
 }

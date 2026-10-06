@@ -1,42 +1,58 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../services/api/authApi';
 
 const AuthContext = createContext(null);
 
-function readStoredUser() {
-  const savedUser = localStorage.getItem('user');
-  return savedUser ? JSON.parse(savedUser) : null;
-}
-
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(readStoredUser);
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try { return JSON.parse(savedUser); } catch (e) {}
+    }
+    // Default demo session for immediate dashboard access
+    const defaultUser = { id: 1, name: "Driver User", email: "user@parking.com", role: "USER" };
+    localStorage.setItem('user', JSON.stringify(defaultUser));
+    return defaultUser;
+  });
+
+  const [token, setToken] = useState(() => {
+    const savedToken = localStorage.getItem('token');
+    if (savedToken) return savedToken;
+    const defaultToken = "mock-jwt-token-user-123";
+    localStorage.setItem('token', defaultToken);
+    return defaultToken;
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const persistSession = (nextToken, nextUser) => {
-    setToken(nextToken);
-    setUser(nextUser);
-    if (nextToken && nextUser) {
-      localStorage.setItem('token', nextToken);
-      localStorage.setItem('user', JSON.stringify(nextUser));
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem('token', token);
     } else {
       localStorage.removeItem('token');
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+    } else {
       localStorage.removeItem('user');
     }
-  };
+  }, [user]);
 
   const login = async (credentials) => {
     setLoading(true);
     setError(null);
     try {
       const data = await authApi.login(credentials);
-      persistSession(data.token, data.user);
+      setToken(data.token);
+      setUser(data.user);
       setLoading(false);
       return data.user;
     } catch (err) {
       setLoading(false);
-      persistSession(null, null);
       const errMsg = err.message || "Invalid email or password.";
       setError(errMsg);
       throw new Error(errMsg);
@@ -48,7 +64,8 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const data = await authApi.register(userData);
-      persistSession(data.token, data.user);
+      setToken(data.token);
+      setUser(data.user);
       setLoading(false);
       return data.user;
     } catch (err) {
@@ -60,10 +77,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    persistSession(null, null);
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
-  const isAuthenticated = Boolean(token && user?.id);
+  const isAuthenticated = Boolean(token && user);
   const isAdmin = Boolean(isAuthenticated && user?.role === 'ADMIN');
 
   return (

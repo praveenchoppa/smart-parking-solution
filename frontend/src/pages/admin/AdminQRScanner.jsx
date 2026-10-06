@@ -1,136 +1,205 @@
-import React, { useState } from 'react';
-import { QrCode, Camera, CheckCircle2, XCircle, AlertTriangle, ShieldCheck, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
+import { QrCode, Camera, Keyboard, CheckCircle, XCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 import { adminApi } from '../../services/api/adminApi';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import StatusBadge from '../../components/common/StatusBadge';
 
 export default function AdminQRScanner() {
-  const [inputCode, setInputCode] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [scanResult, setScanResult] = useState(null);
+  const [activeTab, setActiveTab] = useState('camera'); // 'camera' | 'manual'
+  const [manualCode, setManualCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [result, setResult] = useState(null);
 
-  const handleScanSubmit = async (e) => {
-    e.preventDefault();
-    if (!inputCode.trim()) return;
+  useEffect(() => {
+    let scanner = null;
+    if (activeTab === 'camera') {
+      scanner = new Html5QrcodeScanner(
+        'qr-reader-container',
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        false
+      );
 
-    setSubmitting(true);
-    setScanResult(null);
+      scanner.render(
+        (decodedText) => {
+          handleVerifyCode(decodedText);
+          scanner.clear();
+        },
+        (error) => {
+          // Silent camera frame scan error
+        }
+      );
+    }
+
+    return () => {
+      if (scanner) {
+        scanner.clear().catch(() => {});
+      }
+    };
+  }, [activeTab]);
+
+  const handleVerifyCode = async (codeToVerify) => {
+    const code = (codeToVerify || manualCode).trim();
+    if (!code) return;
+
+    setVerifying(true);
+    setResult(null);
+
     try {
-      // POST /api/check-in -> Returns authoritative result from Spring Boot backend
-      const result = await adminApi.processCheckIn(inputCode.trim());
-      setScanResult(result);
-      setSubmitting(false);
+      const response = await adminApi.processCheckIn(code);
+      setResult(response);
+      setVerifying(false);
     } catch (err) {
-      setSubmitting(false);
-      setScanResult({
-        status: "INVALID",
-        message: err.message || "Failed to verify check-in code with backend."
+      setVerifying(false);
+      setResult({
+        status: 'FAILED',
+        message: err.message || 'Gate verification failed.'
       });
     }
   };
 
-  const getResultBadge = (status) => {
-    switch (status) {
-      case 'VALID':
-        return { bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300', icon: CheckCircle2, title: 'VALID CHECK-IN (ACCESS GRANTED)' };
-      case 'ALREADY_CHECKED_IN':
-        return { bg: 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300', icon: AlertTriangle, title: 'ALREADY CHECKED IN' };
-      case 'COMPLETED':
-        return { bg: 'bg-slate-500/10 border-slate-500/30 text-slate-700 dark:text-slate-300', icon: AlertTriangle, title: 'SESSION COMPLETED' };
-      case 'UNPAID':
-        return { bg: 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300', icon: XCircle, title: 'UNPAID RESERVATION' };
-      default:
-        return { bg: 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300', icon: XCircle, title: 'INVALID / NOT FOUND' };
-    }
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    handleVerifyCode(manualCode);
   };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm text-center">
-        <div className="w-14 h-14 bg-brand-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-md shadow-brand-600/30">
-          <Camera className="w-8 h-8" />
-        </div>
+      {/* Header */}
+      <div>
         <h1 className="text-2xl font-black text-slate-900 dark:text-white">Gate Security QR Scanner</h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Scan user digital pass or enter booking code to process Spring Boot check-in
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          Verify driver check-in passes at the parking entry gate via camera scan or manual code input
         </p>
       </div>
 
-      {/* Code Input Form / Scanner simulation */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-        
-        <form onSubmit={handleScanSubmit} className="space-y-4">
-          <Input
-            label="Scan / Enter Booking Code"
-            icon={QrCode}
-            value={inputCode}
-            onChange={(e) => setInputCode(e.target.value)}
-            placeholder="Enter the booking code from the user pass"
-            required
-          />
+      {/* Mode Selector Tabs */}
+      <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={() => setActiveTab('camera')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-mono font-bold rounded-lg transition-all ${
+            activeTab === 'camera'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Camera className="w-4 h-4" />
+          <span>Camera Scanner</span>
+        </button>
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            isLoading={submitting}
-            icon={ArrowRight}
-            className="w-full shadow-lg shadow-brand-600/30"
-          >
-            Verify Pass with Spring Boot Backend
-          </Button>
-        </form>
+        <button
+          type="button"
+          onClick={() => setActiveTab('manual')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-mono font-bold rounded-lg transition-all ${
+            activeTab === 'manual'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Keyboard className="w-4 h-4" />
+          <span>Manual Booking Code</span>
+        </button>
       </div>
 
-      {/* Authoritative Backend Result Display */}
-      {scanResult && (() => {
-        const badge = getResultBadge(scanResult.status);
-        const Icon = badge.icon;
-        return (
-          <div className={`border rounded-3xl p-6 space-y-4 animate-in fade-in ${badge.bg}`}>
-            <div className="flex items-center gap-3">
-              <Icon className="w-8 h-8 shrink-0" />
-              <div>
-                <h3 className="text-lg font-black">{badge.title}</h3>
-                <p className="text-xs opacity-90">{scanResult.message}</p>
-              </div>
-            </div>
+      {/* Main Scanner Container */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+        
+        {activeTab === 'camera' ? (
+          <div className="space-y-4">
+            <div id="qr-reader-container" className="overflow-hidden rounded-xl border border-slate-200" />
+            <p className="text-center text-xs text-slate-400 font-mono">
+              Position the driver's QR pass in front of the camera to verify entry
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleManualSubmit} className="space-y-4">
+            <Input
+              label="Enter 10-Character Booking Code"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="e.g. BK101-A1F9"
+              required
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              className="w-full"
+              isLoading={verifying}
+              disabled={verifying || !manualCode.trim()}
+            >
+              Verify Gate Check-In
+            </Button>
+          </form>
+        )}
+      </div>
 
-            {scanResult.bookingCode && (
-              <div className="bg-white/80 dark:bg-slate-900/80 rounded-2xl p-4 border border-current/10 space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="opacity-70">Booking Code:</span>
-                  <span className="font-mono font-bold">{scanResult.bookingCode}</span>
-                </div>
-                {scanResult.parkingAreaName && (
-                  <div className="flex justify-between">
-                    <span className="opacity-70">Parking Lot:</span>
-                    <span className="font-bold">{scanResult.parkingAreaName}</span>
-                  </div>
-                )}
-                {scanResult.slotNumber && (
-                  <div className="flex justify-between">
-                    <span className="opacity-70">Slot Allocated:</span>
-                    <span className="font-extrabold">{scanResult.slotNumber}</span>
-                  </div>
-                )}
-                {scanResult.vehicleNumber && (
-                  <div className="flex justify-between">
-                    <span className="opacity-70">Vehicle:</span>
-                    <span className="font-mono font-bold">{scanResult.vehicleNumber}</span>
-                  </div>
-                )}
-              </div>
+      {/* Verification Result Card */}
+      {result && (
+        <div className={`border rounded-2xl p-6 shadow-lg transition-all ${
+          result.status === 'VALID'
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-100'
+            : result.status === 'ALREADY_CHECKED_IN'
+            ? 'bg-amber-50 border-amber-300 text-amber-950 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-100'
+            : 'bg-rose-50 border-rose-300 text-rose-950 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-100'
+        }`}>
+          <div className="flex items-start gap-4">
+            {result.status === 'VALID' ? (
+              <CheckCircle className="w-8 h-8 text-emerald-600 shrink-0 mt-1" />
+            ) : result.status === 'ALREADY_CHECKED_IN' ? (
+              <AlertCircle className="w-8 h-8 text-amber-600 shrink-0 mt-1" />
+            ) : (
+              <XCircle className="w-8 h-8 text-rose-600 shrink-0 mt-1" />
             )}
 
-            <div className="flex items-center justify-center gap-1.5 text-[10px] opacity-70 font-semibold pt-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Result verified by Spring Boot check-in service</span>
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black tracking-tight">{result.status} GATE VERIFICATION</h3>
+                <StatusBadge status={result.status === 'VALID' ? 'CHECKED_IN' : result.status} />
+              </div>
+
+              <p className="text-xs font-medium opacity-90">{result.message}</p>
+
+              {result.bookingCode && (
+                <div className="grid grid-cols-2 gap-3 pt-3 mt-3 border-t border-current/15 text-xs font-mono">
+                  <div>
+                    <span className="opacity-60 block text-[10px]">BOOKING CODE</span>
+                    <span className="font-bold">{result.bookingCode}</span>
+                  </div>
+                  <div>
+                    <span className="opacity-60 block text-[10px]">ASSIGNED BAY</span>
+                    <span className="font-bold">{result.slotNumber}</span>
+                  </div>
+                  <div>
+                    <span className="opacity-60 block text-[10px]">VEHICLE PLATE</span>
+                    <span className="font-bold">{result.vehicleNumber}</span>
+                  </div>
+                  <div>
+                    <span className="opacity-60 block text-[10px]">PARKING LOCATION</span>
+                    <span className="font-bold">{result.parkingAreaName}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <Button
+                  onClick={() => {
+                    setResult(null);
+                    setManualCode('');
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Scan Next Driver Pass
+                </Button>
+              </div>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 }
